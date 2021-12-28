@@ -5,6 +5,9 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 
 using PoPoolImpute
 
+### navigate to testing directory
+cd("test/")
+
 ### Uncompress test pileup file
 run(`time tar -xvf test.pileup.tar.xz`)
 
