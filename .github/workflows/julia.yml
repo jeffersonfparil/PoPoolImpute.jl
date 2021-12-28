@@ -40,5 +40,5 @@ jobs:
         run: julia -e 'import Pkg; Pkg.add("UnicodePlots")' 
       - name: Tests
         run: |
-          println(pwd())
+          @show pwd()
         shell: julia {0}
