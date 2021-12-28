@@ -1,7 +1,5 @@
-### working directory
-# str_working_directory = "/data/weedomics/2.c_60_populations_genotyping"
-str_directory_test = "/home/jeff/Documents/PoPoolImpute.jl/test"
-cd(str_directory_test)
+using Test
+using PoPoolImpute
 
 ### Uncompress test pileup file
 run(`time tar -xvf test.pileup.tar.xz`)
@@ -9,16 +7,16 @@ run(`time tar -xvf test.pileup.tar.xz`)
 ### simulate 10% missing loci in 10% of the pools
 run(`time ./simulate_missing_loci_in_pileup_file.sh -f test.pileup -p 0.10 -l 0.10`)
 
-### load the PoPoolImpute package
-str_directory_src = "/home/jeff/Documents/PoPoolImpute.jl/src"
-include(string(str_directory_src, "/PoPoolImpute.jl"))
 
 ### input and ouput files
 str_filename_withMissing = "out_simissing.pileup"
 str_filename_output = string("output-imputed-", time(),".syncx")
 
 ### impute
-@time PoPoolImpute.PopPoolImpute(str_filename_withMissing, str_filename_output=str_filename_output)
+@time Test.@test PoPoolImpute.PopPoolImpute(
+                                            str_filename_withMissing,
+                                            str_filename_output=str_filename_output
+                                            )==0
 
 ### load imputation output
 X = hcat(split.(readlines(str_filename_output), ",")...)
