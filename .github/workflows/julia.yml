@@ -40,7 +40,8 @@ jobs:
         run: julia -e 'import Pkg; Pkg.add("Test"); Pkg.add("UnicodePlots")'
       - name: Test with in-line script
         run: |
-          @show "testing"
+          @show pwd()
         shell: julia {0}
       - name:  Test using "test/runtests.jl"
-        uses: julia-actions/julia-runtest@v1
+        # uses: julia-actions/julia-runtest@v1
+        - run: julia -e 'include("test/runtests.jl")'
