@@ -34,11 +34,12 @@ jobs:
         #     arch: x86
         #     version: 1
     steps:
-      - name: Checkout the package
+      - name: Setup julia and clone the repo
         uses: actions/checkout@v2
       - name: Install dependencies
         run: julia -e 'import Pkg; Pkg.add("UnicodePlots")' 
-      - name: Tests
+      - name: Tests (In-line script with "@show testing" as well as run test/runtests.jl with julia-actions/julia-runtest@v1)
         run: |
-          include("PoPoolImpute.jl/test/tests.jl")
+          @show "testing"
         shell: julia {0}
+        uses: julia-actions/julia-runtest@v1
