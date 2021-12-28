@@ -38,8 +38,9 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: julia -e 'import Pkg; Pkg.add("UnicodePlots")' 
-      - name: Tests (In-line script with "@show testing" as well as run test/runtests.jl with julia-actions/julia-runtest@v1)
+      - name: Test with in-line script
         run: |
           @show "testing"
         shell: julia {0}
+      - name:  Test using "test/runtests.jl"
         uses: julia-actions/julia-runtest@v1
