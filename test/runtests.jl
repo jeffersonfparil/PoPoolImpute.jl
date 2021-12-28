@@ -1,7 +1,7 @@
 using Test
 using Pkg
 
-Pkd.add("https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+Pkg.add("https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 
 using PoPoolImpute
 
