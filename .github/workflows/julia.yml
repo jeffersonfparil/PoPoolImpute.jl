@@ -39,4 +39,4 @@ jobs:
       - name: Tests
         run: |
           println("test")
-        shell: Rscript {0}
+        shell: julia {0}
