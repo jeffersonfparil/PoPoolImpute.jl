@@ -21,22 +21,24 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
-          - x86
-        include:
-          # test macOS and Windows with latest Julia only
-          - os: macOS-latest
-            arch: x64
-            version: 1
-          - os: windows-latest
-            arch: x64
-            version: 1
-          - os: windows-latest
-            arch: x86
+        #   - x86
+        # include:
+        #   # test macOS and Windows with latest Julia only
+        #   - os: macOS-latest
+        #     arch: x64
+        #     version: 1
+        #   - os: windows-latest
+        #     arch: x64
+        #     version: 1
+        #   - os: windows-latest
+        #     arch: x86
             version: 1
     steps:
       - name: Checkout the package
         uses: actions/checkout@v2
+      - name: Install dependencies
+        run: julia -e 'import Pkg; Pkg.add("UnicodePlots")' 
       - name: Tests
         run: |
-          println("test")
+          println(pwd())
         shell: julia {0}
