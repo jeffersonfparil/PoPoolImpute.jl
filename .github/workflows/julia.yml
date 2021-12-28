@@ -37,7 +37,7 @@ jobs:
       - name: Setup julia and clone the repo
         uses: actions/checkout@v2
       - name: Install dependencies
-        run: julia -e 'import Pkg; Pkg.add(["Test", "UnicodePlots"])' 
+        run: julia -e 'import Pkg; Pkg.add("Test"); Pkg.add("UnicodePlots")'
       - name: Test with in-line script
         run: |
           @show "testing"
