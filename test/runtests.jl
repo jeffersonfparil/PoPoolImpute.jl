@@ -1,4 +1,8 @@
 using Test
+using Pkg
+
+Pkd.add https://github.com/jeffersonfparil/PoPoolImpute.jl.git
+
 using PoPoolImpute
 
 ### Uncompress test pileup file
