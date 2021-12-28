@@ -40,5 +40,5 @@ jobs:
         run: julia -e 'import Pkg; Pkg.add("UnicodePlots")' 
       - name: Tests
         run: |
-          include("test/tests.jl")
+          include("PoPoolImpute.jl/test/tests.jl")
         shell: julia {0}

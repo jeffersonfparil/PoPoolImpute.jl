@@ -45,7 +45,7 @@ mat_bool_missing = ismissing.(mat_WITH_MISSING)
 
 ### plot
 using UnicodePlots
-UnicodePlots.scatterplot(Int.(Y_true), Int.(Y_pred), grid=true, color=:white, canvas=BlockCanvas)
+@show UnicodePlots.scatterplot(Int.(Y_true), Int.(Y_pred), grid=true, color=:white, canvas=BlockCanvas)
 
 ### clean-up
 rm(str_filename_noMissing)
