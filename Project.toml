@@ -1,0 +1,11 @@
+authors = ["Jefferson F. Paril <jeffersonparil@gmail.com>"]
+name = "PoPoolImpute.jl"
+uuid = "f1f486f6-9d9b-4bef-8b7d-74212131ca96"
+version = "0.0.1"
+repository = "https://github.com/jeffersonfparil/PoPoolImpute.jl"
+description = "Impute missing allele frequency information from pool sequencing genotyping experiments."
+keywords = "imputation, pool sequencing, allele frequency, genotype data"
+
+[deps]
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
