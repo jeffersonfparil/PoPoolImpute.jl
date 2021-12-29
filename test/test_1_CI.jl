@@ -10,7 +10,7 @@ cd("test/")
 run(`time tar -xvf test.pileup.tar.xz`)
 
 ### Simulate 10% missing loci in 10% of the pools
-run(`time ./simulate_missing_loci_in_pileup_file.sh -f test.pileup -p 0.50 -l 0.50`)
+run(`time ./2_simulate_missing_loci_in_pileup_file.sh -f test.pileup -p 0.50 -l 0.50`)
 
 
 ### Input and ouput files
