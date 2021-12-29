@@ -6,6 +6,15 @@ using PoPoolImpute
 ### Navigate to testing directory
 cd("test/")
 
+################################
+### TEST LOCALLY
+# using Test
+# using Pkg
+# cd("/home/jeff/Documents/PoPoolImpute.jl/src")
+# include("PoPoolImpute.jl")
+# cd("/home/jeff/Documents/PoPoolImpute.jl/test")
+################################
+
 ### Uncompress test pileup file
 run(`time tar -xvf test.pileup.tar.xz`)
 
@@ -59,13 +68,13 @@ vec_int_order2 = sortperm(string.(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, ["-"],
 mat_int_ALLELE_COUNTS = mat_int_ALLELE_COUNTS[vec_int_order2, :]
 
 ### Identify coordinates of the simulated missing data
-mat_bool_missing = ismissing.(mat_WITH_MISSING)
+mat_bool_missing = vec(ismissing.(mat_WITH_MISSING))
 
 ### Extract the true and imputed data
-@show Y_true = mat_WITHOUT_MISSING[mat_bool_missing]
-@show Y_pred = mat_int_ALLELE_COUNTS[mat_bool_missing]
-@show length(Y_true)
-@show length(Y_pred)
+Y_true = vec(mat_WITHOUT_MISSING)[mat_bool_missing]
+Y_pred = vec(mat_int_ALLELE_COUNTS)[mat_bool_missing]
+# @show length(Y_true)
+# @show length(Y_pred)
 
 ### Calculate imputation accuracy
 @show n_flt_RMSE = sqrt(sum((Y_true .- Y_pred).^2)/prod(size(Y_true)))

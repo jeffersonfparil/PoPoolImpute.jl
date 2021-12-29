@@ -191,8 +191,7 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
     end
     OUT = hcat(repeat(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, inner=n_int_allele_count),
                repeat(vec_int_POSITION, inner=n_int_allele_count),
-               mat_int_ALLELE_COUNTS
-              )
+               mat_int_ALLELE_COUNTS)
     out = join([join(x,',') for x in eachrow(OUT)], '\n')
     file = open(str_filename_output, "a")
     write(file, string(out, '\n'))

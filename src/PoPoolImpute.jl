@@ -26,15 +26,8 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 
 # Examples
 ```
-### Input files:
 str_filename_input = "test/test.pileup"
-### Single-threaded execution:
 using PoPoolImpute
-@time PoPoolImpute(str_filename_input)
-### Multi-threaded execution (parallel execution only applicable to model=="GWAlpha"):
-using Distributed
-Distributed.addprocs(length(Sys.cpu_info())-1)
-@everywhere using PoPoolImpute
 @time PoPoolImpute(str_filename_input)
 ```
 # Details
@@ -68,7 +61,6 @@ function PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_f
 
     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = []
     vec_int_POSITION = []
-    vec_int_imputed_loci_counter = ones(Int, n_int_window_size-1)
 
     n_int_counter_load_first_n_windows_lines_withe_readline = 0
     vec_str_input = []
@@ -82,7 +74,6 @@ function PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_f
         ### if we already have n_int_window_size lines then just remove the old locus and replace with the next one since we have sliding windows
         if n_int_counter_load_first_n_windows_lines_withe_readline == n_int_window_size
             vec_str_input[1:(end-1)] = vec_str_input[2:end]
-            # vec_str_input[end] = readlines(str_filename_input)[n_int_start_locus]
             vec_str_input[end] = readline(FILE)
         else
             ### parse n_int_window_size lines
@@ -114,83 +105,72 @@ function PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_f
                 append!(vec_int_POSITION, vec_int_position)
             else
                 ### append loci information into the output matrix and vectors
-                vec_bool_idx_loci_existing_loci = [x ∈ vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(end-(n_int_window_size-1)):end] for x in vec_str_name_of_chromosome_or_scaffold] .&
-                                                  [x ∈ vec_int_POSITION[(end-(n_int_window_size-1)):end] for x in vec_int_position]
+                vec_bool_idx_loci_existing_loci = [x ∈ vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD for x in vec_str_name_of_chromosome_or_scaffold] .&
+                                                  [x ∈ vec_int_POSITION for x in vec_int_position]
                 vec_bool_idx_loci_new_loci_to_add = .!vec_bool_idx_loci_existing_loci
+                # @show vec_int_POSITION
+                # @show vec_int_position
+                
+                ### Do we have more than 1 new loci (happens if we skip loci due to the inability to impute because of too many missing data)
+                n_int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
+                # @show n_int_new_loci_count
+
                 ### if we have imputed allele counts, then use the average of the imputed allele counts
                 if mat_imputed != "Not missing but no imputation needed since no loci were missing."
-                    ### Compute the average allele count
-                    vec_idx_bool_loci_missing_less_new_locus = vec_bool_idx_loci_missing[1:(end-n_int_allele_count)]
-                    mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(n_int_allele_count*(n_int_window_size-1))+1):end, :]
-                    mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-n_int_allele_count), :]
-                    mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_locus, (n_int_allele_count, n_int_window_size-1))'
-                    vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
-                    vec_n = repeat(vec_int_imputed_loci_counter[vec_bool_index_for_vec_int_imputed_loci_counter], inner=n_int_allele_count)
-                    A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_locus, :]
-                    B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_locus, :]
-                    C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
-                    ### Update allele counts with the average
-                    mat_int_ALLELE_COUNTS[(end-(n_int_allele_count*(n_int_window_size-1))+1):end, :][vec_idx_bool_loci_missing_less_new_locus, :] = C
-                    ### Update counter
-                    vec_int_imputed_loci_counter = vec_int_imputed_loci_counter .+ vec_bool_index_for_vec_int_imputed_loci_counter
-                    vec_int_imputed_loci_counter[1:(end-1)] = vec_int_imputed_loci_counter[2:(end-0)]
-                    vec_int_imputed_loci_counter[end] = 1
+                    if n_int_new_loci_count < n_int_window_size
+                        ### Compute the average allele count
+                        vec_idx_bool_loci_missing_less_new_locus = vec_bool_idx_loci_missing[1:(end-(n_int_allele_count*n_int_new_loci_count))]
+                        mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(n_int_allele_count*(n_int_window_size-n_int_new_loci_count))+1):end, :]
+                        mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(n_int_allele_count*n_int_new_loci_count)), :]
+                        mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_locus, (n_int_allele_count, n_int_window_size-n_int_new_loci_count))'
+                        vec_int_imputed_loci_counter = ones(Int, n_int_window_size-n_int_new_loci_count)
+                        vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
+                        vec_n = repeat(vec_int_imputed_loci_counter[vec_bool_index_for_vec_int_imputed_loci_counter], inner=n_int_allele_count)
+                        A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_locus, :]
+                        B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_locus, :]
+                        C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
+                        ### Update allele counts with the average
+                        mat_int_ALLELE_COUNTS[(end-(n_int_allele_count*(n_int_window_size-n_int_new_loci_count))+1):end, :][vec_idx_bool_loci_missing_less_new_locus, :] = C
+                        ### Update counter
+                        vec_int_imputed_loci_counter = vec_int_imputed_loci_counter .+ vec_bool_index_for_vec_int_imputed_loci_counter
+                        vec_int_imputed_loci_counter[1:(end-1)] = vec_int_imputed_loci_counter[2:(end-0)]
+                        vec_int_imputed_loci_counter[end] = 1
+                    end
                 end
-                ### add new loci regardless of whether or not we have imputed missing allele counts
-                # mat_int_ALLELE_COUNTS = vcat(mat_int_ALLELE_COUNTS, mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :])
-                # append!(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add])
-                # append!(vec_int_POSITION, vec_int_position[vec_bool_idx_loci_new_loci_to_add])
 
                 ### Save the file per window because it's nice to have the output written into disk rather than memory in case anything unsavory happens prior to finishing the entire job - then at least we'll have a partial output rather than nothing at all
                 ### Save a locus once we're done with the trailing end of the previous window
                 if (n_int_start_locus >= 2)
-                    # OUT = hcat(repeat([vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[end-n_int_window_size]], inner=n_int_allele_count),
-                    #            repeat([vec_int_POSITION[end-n_int_window_size]], inner=n_int_allele_count),
-                    #            mat_int_ALLELE_COUNTS[((end-(n_int_window_size*n_int_allele_count))-n_int_allele_count+1):(end-(n_int_window_size*n_int_allele_count)), :]
-                    #           )
-                    # OUT = hcat(repeat([vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1]], inner=n_int_allele_count),
-                    #            repeat([vec_int_POSITION[1]], inner=n_int_allele_count),
-                    #            mat_int_ALLELE_COUNTS[((end-(n_int_window_size*n_int_allele_count))+1):((end-(n_int_window_size*n_int_allele_count))+n_int_allele_count), :]
-                    #           )
-                    # out = join([join(x,',') for x in eachrow(OUT)], '\n')
-                    # file = open(str_filename_output, "a")
-                    # write(file, string(out, '\n'))
-                    # close(file)
+                    println("Debugging.............................. --- 0")
                     fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
-                                    vec_int_POSITION[1],
-                                    mat_int_ALLELE_COUNTS[((end-(n_int_window_size*n_int_allele_count))+1):((end-(n_int_window_size*n_int_allele_count))+n_int_allele_count), :],
-                                    n_int_allele_count,
-                                    str_filename_output)
+                                       vec_int_POSITION[1],
+                                       mat_int_ALLELE_COUNTS[1:n_int_allele_count, :],
+                                       n_int_allele_count,
+                                       str_filename_output)
                 end
                 
                 ### Update with new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
-                # println("Debugging.............................. --- 1")
-                mat_int_ALLELE_COUNTS[1:(end-n_int_allele_count), :] = mat_int_ALLELE_COUNTS[(n_int_allele_count+1):end, :]
-                n_int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
-                mat_int_ALLELE_COUNTS[((end-(n_int_allele_count*n_int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :]
-                vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-1)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[2:end]
-                vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add][1]
-                vec_int_POSITION[1:(end-1)] = vec_int_POSITION[2:end]
-                vec_int_POSITION[end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add][1]
+                if n_int_new_loci_count < n_int_window_size
+                    mat_int_ALLELE_COUNTS[1:(end-(n_int_allele_count*n_int_new_loci_count)), :] = mat_int_ALLELE_COUNTS[((n_int_allele_count*n_int_new_loci_count)+1):end, :]
+                    mat_int_ALLELE_COUNTS[((end-(n_int_allele_count*n_int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :]
+                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-n_int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(n_int_new_loci_count+1):end]
+                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[((end-n_int_new_loci_count)+1):end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add]
+                    vec_int_POSITION[1:(end-n_int_new_loci_count)] = vec_int_POSITION[(n_int_new_loci_count+1):end]
+                    vec_int_POSITION[((end-n_int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
+                else
+                    mat_int_ALLELE_COUNTS[1:end,:] = mat_int_window_counts
+                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:end] = vec_str_name_of_chromosome_or_scaffold
+                    vec_int_POSITION[1:end] = vec_int_position
+                end
                 ### If we reach the end of the file (1 window offset)
                 if n_int_start_locus == ((n_int_total_loci-n_int_window_size) + 1)
-                    # OUT = hcat(repeat(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(end-n_int_window_size):end], inner=n_int_allele_count),
-                    #            repeat(vec_int_POSITION[(end-n_int_window_size):end], inner=n_int_allele_count),
-                    #            mat_int_ALLELE_COUNTS[((end-(n_int_window_size*n_int_allele_count))-n_int_allele_count+1):end, :]
-                    #           )
-                    # OUT = hcat(repeat(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, inner=n_int_allele_count),
-                    #            repeat(vec_int_POSITION, inner=n_int_allele_count),
-                    #            mat_int_ALLELE_COUNTS
-                    #           )
-                    # out = join([join(x,',') for x in eachrow(OUT)], '\n')
-                    # file = open(str_filename_output, "a")
-                    # write(file, string(out, '\n'))
-                    # close(file)
-                    fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD,
-                                    vec_int_POSITION,
-                                    mat_int_ALLELE_COUNTS,
-                                    n_int_allele_count,
-                                    str_filename_output)
+                    for i in 1:length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD)
+                        fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[i],
+                                        vec_int_POSITION[i],
+                                        mat_int_ALLELE_COUNTS[(((i-1)*n_int_allele_count)+1):(i*n_int_allele_count), :],
+                                        n_int_allele_count,
+                                        str_filename_output)
+                    end
                 end
             end
         end
