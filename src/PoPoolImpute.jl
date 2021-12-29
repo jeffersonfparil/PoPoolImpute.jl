@@ -1,5 +1,6 @@
 module PoPoolImpute
 
+using LinearAlgebra
 include("functions.jl") ### load the functions with the module name qualifier
 using .functions: fun_ascii_allele_states_to_counts_per_locus,
                                 fun_ascii_allele_states_to_counts_per_window, 
@@ -11,11 +12,12 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 # __________________________________________________________________
 # PopoolImpute: impute allele frequency data from pool sequencing
 
-`PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"], n_int_window_size=10, str_filename_output="output-imputed.syncx")`
+`PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")`
 
 
 # Inputs
-1. *str_filename_input* [String]: filename of the genotype data in [pileup format (.sync)](http://samtools.sourceforge.net/pileup.shtml)
+1. *str_filename_input* [String]: filename of the genotype data in [pileup format (.pileup)](http://samtools.sourceforge.net/pileup.shtml)
+1. *n_int_window_size* [Integer; default=10]: size of the sliding window across which the
 ...
 
 # Outputs
@@ -39,16 +41,19 @@ Distributed.addprocs(length(Sys.cpu_info())-1)
 ...
 
 """
-function PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"], n_int_window_size=10, str_filename_output="output-imputed.syncx")
+function PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")
     ###################################################################
     ### TEST
-    # str_filename_input = "out_simissing.mpileup.debugging"
-    # vec_allele_names = ["A", "T", "C", "G", "INS", "DEL", "N"]
+    # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
+    # str_filename_input = "out_simissing.pileup"
     # n_int_window_size = 10
+    # n_flt_maximum_fraction_of_pools_with_missing = 0.5
+    # n_flt_maximum_fraction_of_loci_with_missing = 0.5
     # str_filename_output = "output-imputed.syncx"
     ###################################################################
     ### number of loci, alleles, and pools
     n_int_total_loci = countlines(str_filename_input)
+    vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
     n_int_allele_count = length(vec_allele_names)
     ### check if we have the expected number of columns in the first line of the pileup file, i.e. each pool has 3 columns each
     vec_line = split(readline(str_filename_input), "\t")
@@ -70,13 +75,14 @@ function PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G",
     FILE = open(str_filename_input)
 
     for n_int_start_locus in 1:((n_int_total_loci-n_int_window_size) + 1)
-        # n_int_start_locus = 2
+        # n_int_start_locus = 25
         # @show n_int_start_locus
         fun_simple_progress_bar(n_int_start_locus, (n_int_total_loci-n_int_window_size) + 1, 50)
         # vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
         ### if we already have n_int_window_size lines then just remove the old locus and replace with the next one since we have sliding windows
         if n_int_counter_load_first_n_windows_lines_withe_readline == n_int_window_size
             vec_str_input[1:(end-1)] = vec_str_input[2:end]
+            # vec_str_input[end] = readlines(str_filename_input)[n_int_start_locus]
             vec_str_input[end] = readline(FILE)
         else
             ### parse n_int_window_size lines
@@ -91,7 +97,7 @@ function PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G",
         ### If we have missing loci then impute, else just add the allele counts without missing information
         if n_bool_window_with_at_least_one_missing_locus
             ### impute
-            mat_imputed, vec_bool_idx_pools_with_missing_loci, vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts)
+            mat_imputed, vec_bool_idx_pools_with_missing_loci, vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_pools_with_missing, n_flt_maximum_fraction_of_loci_with_missing)
             ### replace missing data with the imputed or predicted allele counts if we were able to impute, i.e. we got at mot most 50% of the pools with missing loci, and 50% of the loci with missing data
             if !ismissing(mat_imputed)
                 mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_with_missing_loci] = mat_imputed
@@ -120,9 +126,6 @@ function PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G",
                     mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_locus, (n_int_allele_count, n_int_window_size-1))'
                     vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
                     vec_n = repeat(vec_int_imputed_loci_counter[vec_bool_index_for_vec_int_imputed_loci_counter], inner=n_int_allele_count)
-                    # @show n_int_start_locus
-                    # @show vec_n
-                    # println("Debugging..............................")
                     A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_locus, :]
                     B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_locus, :]
                     C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
@@ -161,8 +164,10 @@ function PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G",
                 end
                 
                 ### Update with new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
+                # println("Debugging.............................. --- 1")
                 mat_int_ALLELE_COUNTS[1:(end-n_int_allele_count), :] = mat_int_ALLELE_COUNTS[(n_int_allele_count+1):end, :]
-                mat_int_ALLELE_COUNTS[((end-n_int_allele_count)+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :]
+                n_int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
+                mat_int_ALLELE_COUNTS[((end-(n_int_allele_count*n_int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :]
                 vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-1)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[2:end]
                 vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add][1]
                 vec_int_POSITION[1:(end-1)] = vec_int_POSITION[2:end]
@@ -190,8 +195,10 @@ function PopPoolImpute(str_filename_input; vec_allele_names=["A", "T", "C", "G",
             end
         end
     end
+    ### Note: loci which cannot be imputed are not included in the output file
+    ### Close input file
     close(FILE)
-    # return(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSITION, mat_int_ALLELE_COUNTS)
+    ### Return zero is all is well.
     return(0)
 end
 

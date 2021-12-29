@@ -127,11 +127,28 @@ function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_
         ### allele counts of pools without missing loci at loci with missing data (m_P non-missing loci x n_P pools without missing locus)
         X = Number.(mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_without_missing_loci])
         ### predictors of allele counts in the pools with missing loci (n_P pools without missing missing loci x n_M pools with missing loci)
-        B = X\Y
-        ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
-        X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
-        ### prediced allele counts at the loci with missing data (m_M missing loci x n_M pools with missing loci)
-        Y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
+        ### Model the distribution of allele frequencies among the pools with missing data
+        ###     as functions of the allele frequencies of the pools without missing data
+        B = try
+            ### Automatic julia solver
+            X\Y
+        catch
+            ### Moore-Penrose pseudoinverse if the automatic solver fails
+            try
+                LinearAlgebra.pinv(X'*X)*(X'*Y)
+            catch
+                missing
+            end
+        end
+        ### If our solver fails return missing
+        if ismissing(B)
+            Y_pred = missing
+        else
+            ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
+            X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
+            ### prediced allele counts at the loci with missing data (m_M missing loci x n_M pools with missing loci)
+            Y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
+        end
     else
         Y_pred = missing
     end
