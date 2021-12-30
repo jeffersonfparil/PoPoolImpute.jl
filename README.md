@@ -39,17 +39,17 @@ Performs a simple least squares linear regression to predict missing allele coun
 
 **Yₚ = XₚB**
 
-**→ B̂ = inverse(XₚᵀXₚ) (XₚᵀYₚ)**.
+**→ $\bf{\hat B}$ = inverse(XₚᵀXₚ) (XₚᵀYₚ)**.
 
 Imputation is achieved by predicting the missing allele counts:
 
-**Ŷₘ = XₘB̂**.
+**Ŷₘ = Xₘ$\bf{\hat B}$**.
 
 Where:
 
 - **Yₚ** is the matrix of allele counts of pools with missing data at the loci without missing data (dimensions: **mₚ** non-missing loci × 7 alleles, **nₘ** pools with missing loci);
 - **Xₚ** is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: **mₚ** non-missing loci × 7 alleles, **nₚ** pools without missing loci);
-- **B̂** is the matrix of estimates of the effects of each pool without missing data on the allele counts of the pools with missing data (dimensions: **nₚ** pools without missing loci, **nₘ** pools with missing loci);
+- **$\bf{\hat B}$** is the matrix of estimates of the effects of each pool without missing data on the allele counts of the pools with missing data (dimensions: **nₚ** pools without missing loci, **nₘ** pools with missing loci);
 - **inverse()** is the Moore-Penrose pseudoinverse if the automatic Julia solver fails;
 - **Ŷₘ** is the matrix of imputed allele counts of pools with missing data (dimensions: **mₘ** missing loci × 7 alleles, **nₘ** pools with missing loci); and
 - **Xₘ** is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: **mₘ** non-missing loci × 7 alleles, **nₚ** pools without missing loci).
