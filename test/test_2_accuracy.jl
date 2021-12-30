@@ -1,5 +1,5 @@
 using UnicodePlots
-include("test_1_CI.jl")
+include("test/test_1_CI.jl")
 
 P_missing_pools = 0.50
 P_missing_loci = 0.50
