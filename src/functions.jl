@@ -161,7 +161,7 @@ function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_
     ###     - empirical data of Drosophila, Lolium (Arabidopsis?), and human cancer cells pool-seq data
 end
 
-### simple progress bar
+### Simple progress bar
 function fun_simple_progress_bar(n_int_current, n_int_max, n_int_length=50)
     ######################
     ### TEST
@@ -181,7 +181,7 @@ function fun_simple_progress_bar(n_int_current, n_int_max, n_int_length=50)
     end
 end
 
-### In-run wite file into disk
+### Write file into disk (for writing the output one locus at a time as the imputation algorithm runs iteratively across sliding windows)
 function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSITION, mat_int_ALLELE_COUNTS, n_int_allele_count, str_filename_output)
     if !isa(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, Array)
         vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = [vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD]

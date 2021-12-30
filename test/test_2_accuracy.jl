@@ -1,21 +1,27 @@
-include("PoPoolImpute.jl")
+using UnicodePlots
+include("test_1_CI.jl")
 
-### Navigate to testing directory
-cd("../test/")
+P_missing_pools = 0.50
+P_missing_loci = 0.50
+n_int_number_of_iterations = 10
 
-### Uncompress test pileup file
-run(`time tar -xvf test.pileup.tar.xz`)
+vec_flt_fraction_missing_imputed = []
+vec_flt_RMSE = []
 
-### Simulate 10% missing loci in 10% of the pools
-run(`time ./2_simulate_missing_loci_in_pileup_file.sh -f test.pileup -p 0.50 -l 0.50`)
+for t in 1:n_int_number_of_iterations
+    n_flt_fraction_missing_imputed, n_flt_RMSE = fun_sim_impute_check(P_missing_pools=P_missing_pools,
+                                                                      P_missing_loci=P_missing_loci,
+                                                                      plot=false)
+    append!(vec_flt_fraction_missing_imputed, n_flt_fraction_missing_imputed)
+    append!(vec_flt_RMSE, n_flt_RMSE)
+end
 
+### Plot
+sum(vec_flt_fraction_missing_imputed)/length(vec_flt_fraction_missing_imputed)
+sum(vec_flt_RMSE)/length(vec_flt_RMSE)
 
-### Input and ouput files
-str_filename_withMissing = "out_simissing.pileup"
-str_filename_output = string("output-imputed-", time(),".syncx")
+@show UnicodePlots.histogram(Number.(vec_flt_fraction_missing_imputed))
+@show UnicodePlots.histogram(Number.(vec_flt_RMSE))
 
-### Impute
-@time PoPoolImpute.PopPoolImpute(str_filename_withMissing,
-                                 n_int_window_size=20,
-                                 str_filename_output=str_filename_output)
-
+### Clean-up
+rm("test.pileup")
