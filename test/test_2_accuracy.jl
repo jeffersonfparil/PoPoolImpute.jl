@@ -1,5 +1,5 @@
 using UnicodePlots
-include("test_1_CI.jl")
+include("test_1_CI.jl") ### since if one performs: `julia -e include("test/test_2_accuracy.jl")` the current working directory moves automatically to `test/`
 
 P_missing_pools = 0.50
 P_missing_loci = 0.50
