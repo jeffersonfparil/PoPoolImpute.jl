@@ -14,15 +14,17 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 # ____________________________________________________________________
 # PoPoolImpute: imputation of population- and pool-level genotype data
 
+
+# Usage
 `PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")`
 
 
 # Inputs
 1. str\\_filename\\_input [String]: filename of the genotype data in [pileup format (.pileup)](http://samtools.sourceforge.net/pileup.shtml)
 2. n\\_int\\_window\\_size [Integer; default=10]: size of the sliding window across which imputation is performed
-2. n\\_flt\\_maximum\\_fraction\\_of\\_pools\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the pools with at least one missing locus
-2. n\\_flt\\_maximum\\_fraction\\_of\\_loci\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
-...
+3. n\\_flt\\_maximum\\_fraction\\_of\\_pools\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the pools with at least one missing locus
+4. n\\_flt\\_maximum\\_fraction\\_of\\_loci\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
+
 
 # Output
 str\\_filename\\_output [String; default="output-imputed.syncx"; comma-separated file]
@@ -31,7 +33,7 @@ Syncx format (after popoolation2's sync or synchronised pileup file format):
 - Column 1:   chromosome or scaffold name
 - Column 2:   locus position repeated 7 times corresponding to alleles "A", "T", "C", "G", "INS", "DEL", "N", where "INS" is insertion, "DEL" is deletion, and "N" is unclassified
 - Column 3-n: are the allele counts one column for each pool or population
-...
+
 
 # Examples
 ```
@@ -41,6 +43,8 @@ PoPoolImpute(str_filename_input)
 PoPoolImpute(str_filename_input, n_int_window_size=20, str_filename_output="test-2.syncx")
 PoPoolImpute(str_filename_input, n_flt_maximum_fraction_of_pools_with_missing=0.2, str_filename_output="test-3.syncx")
 ```
+
+
 # Details
 
 Performs a simple least squares linear regression to predict missing allele counts per window:
@@ -63,6 +67,7 @@ Where:
 - Xₘ is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: mₘ non-missing loci × 7 alleles, nₚ pools without missing loci).
 
 The imputed allele counts are averaged across the windows sliding one locus at a time.
+
 
 # Authors
 - Jeff Paril (jeffersonparil@gmail.com; https://orcid.org/0000-0002-5693-4123)
