@@ -51,7 +51,7 @@ Performs a simple least squares linear regression to predict missing allele coun
 
 Yₚ = XₚB
 
-→ B̂ = inverse(Xₚ'Xₚ) (Xₚ'Yₚ).
+→ B̂ = inverse(XₚᵀXₚ) (XₚᵀYₚ).
 
 Imputation is achieved by predicting the missing allele counts:
 
