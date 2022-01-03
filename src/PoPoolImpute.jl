@@ -91,6 +91,7 @@ function PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_f
     println("(version 0.0.1; release 2021/12/30)")
     println("####################################################################")
     ### Count the number of loci, alleles, and pools (check if we have the expected number of columns in the first line of the pileup file, i.e. each pool has 3 columns each)
+    println("Counting the total number of loci in the input pileup file.")
     n_int_total_loci = countlines(str_filename_input)
     vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
     n_int_allele_count = length(vec_allele_names)
@@ -114,6 +115,7 @@ function PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_f
     vec_str_input = []
     FILE = open(str_filename_input)
     ### Iterate per line until we reach the first loci of the last sliding window
+    println("Imputing.")
     for n_int_start_locus in 1:((n_int_total_loci-n_int_window_size) + 1)
         # n_int_start_locus = 25
         # @show n_int_start_locus
