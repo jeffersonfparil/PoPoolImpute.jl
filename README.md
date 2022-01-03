@@ -24,6 +24,11 @@ Imputation of allele frequency information from pool sequencing genotype data.
 - *Column 2*:   locus position repeated 7 times corresponding to alleles "A", "T", "C", "G", "INS", "DEL", "N", where "INS" is insertion, "DEL" is deletion, and "N" is unclassified
 - *Columns 3 to n*: are the allele counts one column for each pool or population
 
+# Installation
+```
+using Pkg
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+```
 
 # Examples
 ```
