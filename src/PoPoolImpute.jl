@@ -39,9 +39,9 @@ Syncx format (after popoolation2's sync or synchronised pileup file format):
 ```
 using PoPoolImpute
 str_filename_input = "test.pileup"
-PoPoolImpute.PoPoolImpute(str_filename_input)
-PoPoolImpute.PoPoolImpute(str_filename_input, n_int_window_size=20, str_filename_output="test-2.syncx")
-PoPoolImpute.PoPoolImpute(str_filename_input, n_flt_maximum_fraction_of_pools_with_missing=0.2, str_filename_output="test-3.syncx")
+PoPoolImpute.impute(str_filename_input)
+PoPoolImpute.impute(str_filename_input, n_int_window_size=20, str_filename_output="test-2.syncx")
+PoPoolImpute.impute(str_filename_input, n_flt_maximum_fraction_of_pools_with_missing=0.2, str_filename_output="test-3.syncx")
 ```
 
 
@@ -74,7 +74,7 @@ The imputed allele counts are averaged across the windows sliding one locus at a
 ...
 
 """
-function PoPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")
+function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")
     ###################################################################
     ### TEST
     # cd("/home/jeff/Documents/PoPoolImpute.jl/test")

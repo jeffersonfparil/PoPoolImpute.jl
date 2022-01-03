@@ -29,7 +29,7 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, plot=fal
     str_filename_output = string("output-imputed-", time(),".syncx")
 
     ### Impute
-    Test.@test PoPoolImpute.PoPoolImpute(str_filename_withMissing,
+    Test.@test PoPoolImpute.impute(str_filename_withMissing,
                                         n_int_window_size=20,
                                         n_flt_maximum_fraction_of_pools_with_missing=0.5,
                                         n_flt_maximum_fraction_of_loci_with_missing=0.5,

@@ -34,9 +34,9 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 ```
 using PoPoolImpute
 str_filename_input = "test.pileup"
-PoPoolImpute.PoPoolImpute(str_filename_input)
-PoPoolImpute.PoPoolImpute(str_filename_input, n_int_window_size=20, str_filename_output="test-2.syncx")
-PoPoolImpute.PoPoolImpute(str_filename_input, n_flt_maximum_fraction_of_pools_with_missing=0.2, str_filename_output="test-3.syncx")
+PoPoolImpute.impute(str_filename_input)
+PoPoolImpute.impute(str_filename_input, n_int_window_size=20, str_filename_output="test-2.syncx")
+PoPoolImpute.impute(str_filename_input, n_flt_maximum_fraction_of_pools_with_missing=0.2, str_filename_output="test-3.syncx")
 ```
 # Details
 
