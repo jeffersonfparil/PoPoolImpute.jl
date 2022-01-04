@@ -35,8 +35,10 @@ function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_alle
                     n_int_counter = n_int_counter + 1 + n_length_deletion_sequence ### remove deletion sequence
                 elseif str_state == "*"
                     dic_allele_counts["DEL"] += 1
-                else
+                elseif str_state ∈ vec_allele_names
                     dic_allele_counts[str_state] += 1
+                else
+                    dic_allele_counts["N"] += 1
                 end
             end
         else

@@ -92,7 +92,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     println("####################################################################")
     ### Count the number of loci, alleles, and pools (check if we have the expected number of columns in the first line of the pileup file, i.e. each pool has 3 columns each)
     println("Counting the total number of loci in the input pileup file.")
-    n_int_total_loci = countlines(str_filename_input)
+    @show n_int_total_loci = countlines(str_filename_input)
     vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
     n_int_allele_count = length(vec_allele_names)
     FILE_to_find_pool_count = open(str_filename_input)
