@@ -37,7 +37,7 @@ jobs:
       - name: Setup julia and clone the repo
         uses: actions/checkout@v2
       - name: Install dependencies
-        run: sudo apt-get install -y tar; julia -e 'import Pkg; Pkg.add("LinearAlgebra"); Pkg.add("UnicodePlots"); ; Pkg.add("Suppressor")'
+        run: sudo apt-get install -y tar; julia -e 'import Pkg; Pkg.add("LinearAlgebra"); Pkg.add("UnicodePlots"); Pkg.add("Distributed"); Pkg.add("ProgressMeter")'
       - name: Test with in-line script
         run: |
           @show "testing"

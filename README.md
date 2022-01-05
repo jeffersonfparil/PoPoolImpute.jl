@@ -6,15 +6,16 @@ Imputation of allele frequency information from pool sequencing genotype data.
 | <a href="https://adaptive-evolution.biosciences.unimelb.edu.au/"><img src="https://adaptive-evolution.biosciences.unimelb.edu.au/Adaptive%20Evolution%20Logo%20mod.png" width="150"></a> | <a href="https://github.com/jeffersonfparil/PoPoolImpute.jl/actions"><img src="https://github.com/jeffersonfparil/PoPoolImpute.jl/actions/workflows/julia.yml/badge.svg"></a> | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
 
 # Usage
-`PopPoolImpute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")`
-
+```
+PopPoolImpute.impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_int_thread_count=1)
+```
 
 # Inputs
 1. *str_filename_input* [String]: filename of the genotype data in [pileup format (.pileup)](http://samtools.sourceforge.net/pileup.shtml)
 2. *n_int_window_size* [Integer; default=10]: size of the sliding window across which imputation is performed
 3. *n_flt_maximum_fraction_of_pools_with_missing* [Float; default=0.5]: maximum tolerable fraction of the pools with at least one missing locus
 4. *n_flt_maximum_fraction_of_loci_with_missing* [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
-
+5. *n_int_thread_count* [Integer; default=1]: number of computing threads to use
 
 # Output
 *str_filename_output* [String; default="output-imputed.syncx"; comma-separated file]
@@ -32,11 +33,17 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 
 # Examples
 ```
+# Single-threaded execution
 using PoPoolImpute
 str_filename_input = "test.pileup"
 PoPoolImpute.impute(str_filename_input)
-PoPoolImpute.impute(str_filename_input, n_int_window_size=20, str_filename_output="test-2.syncx")
-PoPoolImpute.impute(str_filename_input, n_flt_maximum_fraction_of_pools_with_missing=0.2, str_filename_output="test-3.syncx")
+
+# Multi-threaded execution
+using Distributed
+n_int_thread_count = length(Sys.cpu_info())-1
+Distributed.addprocs(n_int_thread_count)
+@everywhere using PoPoolImpute
+PoPoolImpute.impute(str_filename_input, str_filename_output="multithreaded.syncx", n_int_thread_count=n_int_thread_count)
 ```
 # Details
 
