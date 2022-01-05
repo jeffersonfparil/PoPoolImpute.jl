@@ -41,7 +41,6 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, plot=fal
     #                                     n_flt_maximum_fraction_of_pools_with_missing=0.5,
     #                                     n_flt_maximum_fraction_of_loci_with_missing=0.5,
     #                                     str_filename_output=str_filename_output)==0
-    @show readdir()
     Test.@test PoPoolImpute.parallel_impute(str_filename_withMissing,
                                             n_int_thread_count=n_int_thread_count, 
                                             n_int_window_size=20,

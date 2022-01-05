@@ -248,6 +248,7 @@ function parallel_impute(str_filename_input; n_int_thread_count=2, n_int_window_
     ###################################################################
     ### count the number of loci
     @show n_int_total_loci = countlines(str_filename_input)
+    @show readdir()
     ### cut up the input file
     n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_thread_count))
     FILE = open(str_filename_input)
