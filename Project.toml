@@ -9,3 +9,4 @@ keywords = "imputation, pool sequencing, allele frequency, genotype data"
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
