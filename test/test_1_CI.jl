@@ -2,7 +2,14 @@ using Test
 using Pkg
 using UnicodePlots
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-using PoPoolImpute
+# using PoPoolImpute
+
+### testing parallel execution
+using Distributed
+n_int_thread_count = length(Sys.cpu_info())-1
+Distributed.addprocs(n_int_thread_count)
+@everywhere using PoPoolImpute
+# PoPoolImpute.parallel_impute("test/test.pileup")
 
 ### Navigate to testing directory
 cd("test/")
@@ -29,11 +36,17 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, plot=fal
     str_filename_output = string("output-imputed-", time(),".syncx")
 
     ### Impute
-    Test.@test PoPoolImpute.impute(str_filename_withMissing,
-                                        n_int_window_size=20,
-                                        n_flt_maximum_fraction_of_pools_with_missing=0.5,
-                                        n_flt_maximum_fraction_of_loci_with_missing=0.5,
-                                        str_filename_output=str_filename_output)==0
+    # Test.@test PoPoolImpute.impute(str_filename_withMissing,
+    #                                     n_int_window_size=20,
+    #                                     n_flt_maximum_fraction_of_pools_with_missing=0.5,
+    #                                     n_flt_maximum_fraction_of_loci_with_missing=0.5,
+    #                                     str_filename_output=str_filename_output)==0
+    Test.@test PoPoolImpute.parallel_impute(str_filename_withMissing,
+                                            n_int_thread_count=n_int_thread_count, 
+                                            n_int_window_size=20,
+                                            n_flt_maximum_fraction_of_pools_with_missing=0.5,
+                                            n_flt_maximum_fraction_of_loci_with_missing=0.5,
+                                            str_filename_output=str_filename_output)==0
 
     ### Load imputation output
     X = hcat(split.(readlines(str_filename_output), ",")...)

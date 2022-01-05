@@ -1,6 +1,7 @@
 module PoPoolImpute
 
 ### Load linear algebra library for the Moore-Penrose pseudoinverse if the automatic solver fails
+using Distributed
 using LinearAlgebra
 ### Load the functions, and move them into scope
 include("functions.jl")
@@ -231,14 +232,49 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     return(0)
 end
 
-
-
 #########################################################################
 ###################################
 ### TESTING PARALLEL PROCESSING ###
 ###################################
-
-#########################################################################
-
+function parallel_impute(str_filename_input; n_int_thread_count=2, n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")
+    ###################################################################
+    ### TEST
+    # n_int_thread_count = 2
+    # str_filename_input = "test.pileup"
+    # n_int_window_size = 10
+    # n_flt_maximum_fraction_of_pools_with_missing = 0.5
+    # n_flt_maximum_fraction_of_loci_with_missing = 0.5
+    # str_filename_output = "output-imputed.syncx"
+    ###################################################################
+    ### count the number of loci
+    @show n_int_total_loci = countlines(str_filename_input)
+    ### cut up the input file
+    n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_thread_count))
+    FILE = open(str_filename_input)
+    open(str_filename_input) do FILE
+        for i in 1:n_int_thread_count
+            j = 0
+            file = open(string(str_filename_input, "-CHUNK_", i), "w")
+            while (j < n_int_chuck_size) & (!eof(FILE))
+                j += 1
+                line = readline(FILE)
+                write(file, string(line, '\n'))
+            end
+            close(file)
+        end
+    end
+    close(FILE)
+    ### parallel for loop
+    @time _ = @sync @distributed for i in 1:n_int_thread_count
+        str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
+        str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
+        PoPoolImpute.impute(str_filename_chunk_input,
+                            n_int_window_size=n_int_window_size,
+                            n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
+                            n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
+                            str_filename_output=str_filename_chunk_output)
+    end
+    return(0)
+end
 
 end
