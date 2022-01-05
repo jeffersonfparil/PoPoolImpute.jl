@@ -2,7 +2,7 @@ using Test
 using Pkg
 using UnicodePlots
 using Distributed
-n_int_thread_count = length(Sys.cpu_info())-1
+n_int_thread_count = 2
 Distributed.addprocs(n_int_thread_count)
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
