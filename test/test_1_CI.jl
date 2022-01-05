@@ -4,17 +4,16 @@ using UnicodePlots
 using Distributed
 n_int_thread_count = length(Sys.cpu_info())-1
 Distributed.addprocs(n_int_thread_count)
-# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# @everywhere using PoPoolImpute
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+@everywhere using PoPoolImpute
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
-### TEST LOCALLY:
-
-@everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-cd("/home/jeff/Documents/PoPoolImpute.jl/test")
+### TEST LOCALLY: comment-out lines 7 and 8 first
+# @everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+# cd("/home/jeff/Documents/PoPoolImpute.jl/test")
 ################################
 
 ### Uncompress test pileup file
