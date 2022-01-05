@@ -248,7 +248,6 @@ function parallel_impute(str_filename_input; n_int_thread_count=2, n_int_window_
     ###################################################################
     ### count the number of loci
     @show n_int_total_loci = countlines(str_filename_input)
-    @show readdir()
     ### cut up the input file
     n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_thread_count))
     FILE = open(str_filename_input)
@@ -266,6 +265,7 @@ function parallel_impute(str_filename_input; n_int_thread_count=2, n_int_window_
     end
     close(FILE)
     ### parallel for loop
+    @show readdir()
     @time _ = @sync @distributed for i in 1:n_int_thread_count
         str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
         str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
