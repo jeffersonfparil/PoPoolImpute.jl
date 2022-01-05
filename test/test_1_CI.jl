@@ -23,7 +23,7 @@ cd("test/")
 run(`time tar -xvf test.pileup.tar.xz`)
 
 ### Simulate missing loci, impute, load imputation output, and check imputation accuracy
-function fun_sim_impute_check(;P_missing_pools=0.1, P_missing_loci=0.1, plot=false)
+function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, plot=false)
     ### Simulate 10% missing loci in 10% of the pools
     run(`time ./2_simulate_missing_loci_in_pileup_file.sh -f test.pileup -p $P_missing_pools -l $P_missing_loci`)
 
