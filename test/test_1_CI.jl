@@ -1,15 +1,11 @@
 using Test
 using Pkg
 using UnicodePlots
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# using PoPoolImpute
-
-### testing parallel execution
 using Distributed
 n_int_thread_count = length(Sys.cpu_info())-1
 Distributed.addprocs(n_int_thread_count)
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
-# PoPoolImpute.parallel_impute("test/test.pileup")
 
 ### Navigate to testing directory
 cd("test/")
@@ -19,7 +15,7 @@ cd("test/")
 # using Test
 # using Pkg
 # using UnicodePlots
-# include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+# @everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
 ################################
 
@@ -47,7 +43,6 @@ function fun_sim_impute_check(;P_missing_pools=0.1, P_missing_loci=0.1, plot=fal
                                             n_flt_maximum_fraction_of_pools_with_missing=0.5,
                                             n_flt_maximum_fraction_of_loci_with_missing=0.5,
                                             str_filename_output=str_filename_output)==0
-
     ### Load imputation output
     X = hcat(split.(readlines(str_filename_output), ",")...)
     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = X[1,:]

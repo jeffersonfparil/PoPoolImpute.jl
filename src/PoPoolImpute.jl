@@ -250,7 +250,6 @@ function parallel_impute(str_filename_input; n_int_thread_count=2, n_int_window_
     @show n_int_total_loci = countlines(str_filename_input)
     ### cut up the input file
     n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_thread_count))
-    FILE = open(str_filename_input)
     open(str_filename_input) do FILE
         for i in 1:n_int_thread_count
             j = 0
@@ -263,18 +262,32 @@ function parallel_impute(str_filename_input; n_int_thread_count=2, n_int_window_
             close(file)
         end
     end
-    close(FILE)
     ### parallel for loop
-    @show readdir()
+    DIR = pwd()
     @time _ = @sync @distributed for i in 1:n_int_thread_count
-        str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
-        str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
+        str_filename_chunk_input = string(DIR, "/", str_filename_input, "-CHUNK_", i)
+        str_filename_chunk_output = string(DIR, "/", str_filename_output, "-CHUNK_", i)
         PoPoolImpute.impute(str_filename_chunk_input,
                             n_int_window_size=n_int_window_size,
                             n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
                             n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
                             str_filename_output=str_filename_chunk_output)
     end
+    ### concatenate chunks
+    open(str_filename_output, "w") do FILE_OUT
+        for i in 1:n_int_thread_count
+            file = open(string(str_filename_output, "-CHUNK_", i), "r")
+            while !eof(file)
+                line = readline(file)
+                write(FILE_OUT, string(line, '\n'))
+            end
+            close(file)
+            ### clean-up
+            rm(string(str_filename_input, "-CHUNK_", i))
+            rm(string(str_filename_output, "-CHUNK_", i))
+        end
+    end
+    ### return code 0 for no error
     return(0)
 end
 
