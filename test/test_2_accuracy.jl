@@ -8,18 +8,16 @@ n_int_number_of_iterations = 10
 vec_flt_fraction_missing_imputed = []
 vec_flt_RMSE = []
 
-for t in 1:(n_int_number_of_iterations*10)
-    while length(vec_flt_fraction_missing_imputed) < n_int_number_of_iterations
-        try
-            n_flt_fraction_missing_imputed, n_flt_RMSE = fun_sim_impute_check(P_missing_pools=P_missing_pools,
-                                                                            P_missing_loci=P_missing_loci,
-                                                                            plot=false)
-            append!(vec_flt_fraction_missing_imputed, n_flt_fraction_missing_imputed)
-            append!(vec_flt_RMSE, n_flt_RMSE)
-        catch
-            @show "One of the chunks had too many missing data!"
-            continue
-        end
+while length(vec_flt_fraction_missing_imputed) < n_int_number_of_iterations
+    try
+        n_flt_fraction_missing_imputed, n_flt_RMSE = fun_sim_impute_check(P_missing_pools=P_missing_pools,
+                                                                        P_missing_loci=P_missing_loci,
+                                                                        plot=false)
+        append!(vec_flt_fraction_missing_imputed, n_flt_fraction_missing_imputed)
+        append!(vec_flt_RMSE, n_flt_RMSE)
+    catch
+        @show "One of the chunks had too many missing data!"
+        continue
     end
 end
 
