@@ -24,9 +24,8 @@ for t in 1:(n_int_number_of_iterations*10)
 end
 
 ### Plot
-sum(vec_flt_fraction_missing_imputed)/length(vec_flt_fraction_missing_imputed)
-sum(vec_flt_RMSE)/length(vec_flt_RMSE)
-
+@show sum(vec_flt_fraction_missing_imputed)/length(vec_flt_fraction_missing_imputed)
+@show sum(vec_flt_RMSE)/length(vec_flt_RMSE)
 @show UnicodePlots.histogram(Number.(vec_flt_fraction_missing_imputed))
 @show UnicodePlots.histogram(Number.(vec_flt_RMSE))
 
