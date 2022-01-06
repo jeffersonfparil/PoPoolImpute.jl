@@ -40,7 +40,8 @@ jobs:
         run: sudo apt-get install -y tar; julia -e 'import Pkg; Pkg.add("LinearAlgebra"); Pkg.add("UnicodePlots"); Pkg.add("Distributed"); Pkg.add("ProgressMeter")'
       - name:  Test using "test/test_1_CI.jl"
         run: |
-          include("test/test_1_CI.jl")
+          str_dirname_github_action_server = "/home/runner/work/PoPoolImpute.jl"
+          include(string(str_dirname_github_action_server, "/" , "PoPoolImpute.jl/test/test_1_CI.jl"))
           ### using a while-try-catch expression to prevent failure when one of the chunks are too sparse due to stochasticity
           i = 0
           while i < 1
