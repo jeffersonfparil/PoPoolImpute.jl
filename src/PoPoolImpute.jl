@@ -108,6 +108,13 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     @show str_filename_output
     @show n_int_thread_count
     println("####################################################################")
+    ### Define the full path to the input and output files
+    if dirname(str_filename_input) == ""
+        str_filename_input = string(pwd(), "/", str_filename_input)
+    end
+    if dirname(str_filename_output) == ""
+        str_filename_output = string(pwd(), "/", str_filename_output)
+    end
     ### count the number of loci
     println("Counting the total number of loci in the input pileup file.")
     @show n_int_total_loci = countlines(str_filename_input)
@@ -133,15 +140,14 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
             close(file)
         end
     end
-    DIR = pwd()
     println("Imputing.")
     @show n_int_thread_count
     if n_int_thread_count > 1
         ### parallel for loop
         println("Multi-threaded imputation.")
         @time _ = @sync @showprogress @distributed for i in 1:n_int_chunk_count
-            str_filename_chunk_input = string(DIR, "/", str_filename_input, "-CHUNK_", i)
-            str_filename_chunk_output = string(DIR, "/", str_filename_output, "-CHUNK_", i)
+            str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
+            str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
             fun_single_threaded_imputation(str_filename_chunk_input,
                                 n_int_window_size=n_int_window_size,
                                 n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
@@ -151,8 +157,6 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     else
         println("Single-threaded imputation.")
         i = 1
-        str_filename_chunk_input = string(DIR, "/", str_filename_input, "-CHUNK_", i)
-        str_filename_chunk_output = string(DIR, "/", str_filename_output, "-CHUNK_", i)
         fun_single_threaded_imputation(str_filename_chunk_input,
                                 n_int_window_size=n_int_window_size,
                                 n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,

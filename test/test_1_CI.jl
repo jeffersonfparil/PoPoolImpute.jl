@@ -4,23 +4,23 @@ using UnicodePlots
 using Distributed
 n_int_thread_count = 2
 Distributed.addprocs(n_int_thread_count)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
 ### TEST LOCALLY: comment-out lines 7 and 8 first
-# @everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-# cd("/home/jeff/Documents/PoPoolImpute.jl/test")
+@everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+cd("/home/jeff/Documents/PoPoolImpute.jl/test")
 ################################
 
 ### Uncompress test pileup file
 run(`time tar -xvf test.pileup.tar.xz`)
 
 ### Simulate missing loci, impute, load imputation output, and check imputation accuracy
-function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, plot=false)
+function fun_sim_impute_check(;P_missing_pools=0.1, P_missing_loci=0.1, plot=false)
     ### Simulate 10% missing loci in 10% of the pools
     run(`time ./2_simulate_missing_loci_in_pileup_file.sh -f test.pileup -p $P_missing_pools -l $P_missing_loci`)
 

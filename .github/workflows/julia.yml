@@ -45,5 +45,5 @@ jobs:
       - name:  Test using "test/test_1_CI.jl"
         # uses: julia-actions/julia-runtest@v1
         run: julia -e 'include("test/test_1_CI.jl"); fun_sim_impute_check(plot=true)'
-      - name:  Test using "test/test_2_accuracy.jl"
-        run: julia -e 'include("test/test_2_accuracy.jl")'
+      # - name:  Test using "test/test_2_accuracy.jl"
+      #   run: julia -e 'include("test/test_2_accuracy.jl")'
