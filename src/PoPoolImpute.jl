@@ -4,7 +4,7 @@ module PoPoolImpute
 using Distributed
 using ProgressMeter
 using LinearAlgebra
-using Dates ### included in base julia installation as part of the standard library (not included in Project.toml as a dependency)
+using Dates ### included in base julia installation as part of the standard library and so no need to install as a dependency in .github/workflows/julia.yml
 ### Load the functions, and move them into scope
 include("functions.jl")
 using .functions: fun_ascii_allele_states_to_counts_per_locus,
