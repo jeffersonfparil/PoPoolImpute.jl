@@ -4,16 +4,16 @@ using UnicodePlots
 using Distributed
 n_int_thread_count = 2
 Distributed.addprocs(n_int_thread_count)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
 ### TEST LOCALLY: comment-out lines 7 and 8 first
-# @everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-# cd("/home/jeff/Documents/PoPoolImpute.jl/test")
+@everywhere include("/home/jeff/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+cd("/home/jeff/Documents/PoPoolImpute.jl/test")
 ################################
 
 ### Simulate missing loci, impute, load imputation output, and check imputation accuracy
@@ -99,8 +99,9 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_int_nu
         @show sum(vec_flt_RMSE)/length(vec_flt_RMSE)
         @show UnicodePlots.histogram(Number.(vec_flt_fraction_missing_imputed))
         @show UnicodePlots.histogram(Number.(vec_flt_RMSE))
-        rm("test.pileup")
     end
+    ### Clean-up
+    rm("test.pileup")
     ### Output
     return(0)
 end

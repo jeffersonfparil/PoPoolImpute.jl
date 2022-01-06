@@ -4,6 +4,7 @@ module PoPoolImpute
 using Distributed
 using ProgressMeter
 using LinearAlgebra
+using Dates ### included in base julia installation as part of the standard library (not included in Project.toml as a dependency)
 ### Load the functions, and move them into scope
 include("functions.jl")
 using .functions: fun_ascii_allele_states_to_counts_per_locus,
@@ -107,6 +108,8 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     @show n_flt_maximum_fraction_of_loci_with_missing
     @show str_filename_output
     @show n_int_thread_count
+    println("####################################################################")
+    println(string("Time: ", Dates.format(now(), "Y-u-dd(E)THH:MM")))
     println("####################################################################")
     ### Define the full path to the input and output files
     if dirname(str_filename_input) == ""
