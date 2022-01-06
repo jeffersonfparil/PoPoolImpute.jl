@@ -222,9 +222,9 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
     if n_int_pool_count == round(n_int_pool_count)
         n_int_pool_count = Int(n_int_pool_count)
     else
-        println("Ooopsss! Pileup file is corrupted.")
-        println(string("Expected: ", Int(round(n_int_pool_count)), " pools but got ", n_int_pool_count, " pools instead."))
-        println("Please check that each pool or population has 3 columns representing the depth, allele state, and allele quality.")
+        @show "Ooopsss! Pileup file is corrupted."
+        @show string("Expected: ", Int(round(n_int_pool_count)), " pools but got ", n_int_pool_count, " pools instead.")
+        @show "Please check that each pool or population has 3 columns representing the depth, allele state, and allele quality."
     end
     ### Initialise the vectors of scaffold or chromosome names and positions
     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = []

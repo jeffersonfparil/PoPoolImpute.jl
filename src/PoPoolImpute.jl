@@ -115,21 +115,21 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     if dirname(str_filename_output) == ""
         str_filename_output = string(pwd(), "/", str_filename_output)
     end
-    ### count the number of loci
+    ### Count the number of loci
     println("Counting the total number of loci in the input pileup file.")
     @show n_int_total_loci = countlines(str_filename_input)
-    ### define the size of each chunk to cut up the input file
+    ### Define the size of each chunk to cut up the input file
     n_int_chunk_count = n_int_thread_count
-    n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_thread_count))
-    ### rectify chunk size if it is less than twice the n_int_window_size
+    n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_chunk_count))
+    ### Rectify chunk size if it is less than twice the n_int_window_size
     if n_int_chuck_size < 2*n_int_window_size
         n_int_chunk_count = Int(floor(n_int_total_loci / (2*n_int_window_size)))
         n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_chunk_count))
     end
     println(string("The input file was split into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " loci each (at most)."))
-    ### cut up the input file
+    ### Cut up the input file
     open(str_filename_input) do FILE
-        for i in 1:n_int_thread_count
+        for i in 1:n_int_chunk_count
             j = 0
             file = open(string(str_filename_input, "-CHUNK_", i), "w")
             while (j < n_int_chuck_size) & (!eof(FILE))
@@ -143,7 +143,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     println("Imputing.")
     @show n_int_thread_count
     if n_int_thread_count > 1
-        ### parallel for loop
+        ### Parallel for-loop
         println("Multi-threaded imputation.")
         @time _ = @sync @showprogress @distributed for i in 1:n_int_chunk_count
             str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
@@ -163,7 +163,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                                 n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
                                 str_filename_output=str_filename_chunk_output)
     end
-    ### concatenate chunks
+    ### Concatenate chunks
     ### NOTE: The issue here is that the imputed frequencies in the first and last windows were averaged from less imputation data points
     open(str_filename_output, "w") do FILE_OUT
         for i in 1:n_int_chunk_count
@@ -173,7 +173,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                 write(FILE_OUT, string(line, '\n'))
             end
             close(file)
-            ### clean-up
+            ### Clean-up
             rm(string(str_filename_input, "-CHUNK_", i))
             rm(string(str_filename_output, "-CHUNK_", i))
         end
@@ -184,7 +184,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     println("Imputation successful. Please find the output file:")
     println(str_filename_output)
     println("####################################################################")
-    ### return code 0 for no error
+    ### Return code 0 for no error
     return(0)
 end
 
