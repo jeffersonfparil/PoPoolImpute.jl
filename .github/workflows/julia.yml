@@ -44,5 +44,3 @@ jobs:
         shell: julia {0}
       - name:  Test using "test/test_1_CI.jl"
         run: julia -e 'include("test/test_1_CI.jl"); fun_sim_impute_check(plot=true)'
-      - name:  Test using "test/test_2_accuracy.jl"
-        run: julia -e 'include("test/test_2_accuracy.jl")'
