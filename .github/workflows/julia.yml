@@ -38,20 +38,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt-get install -y tar; julia -e 'import Pkg; Pkg.add("LinearAlgebra"); Pkg.add("UnicodePlots"); Pkg.add("Distributed"); Pkg.add("ProgressMeter")'
-      - name:  Test using "test/test_1_CI.jl"
-        run: |
-          str_dirname_github_action_server = "/home/runner/work/PoPoolImpute.jl"
-          include(string(str_dirname_github_action_server, "/" , "PoPoolImpute.jl/test/test_1_CI.jl"))
-          ### using a while-try-catch expression to prevent failure when one of the chunks are too sparse due to stochasticity
-          i = [0]
-          while i[1] < 1
-            try
-              fun_sim_impute_check(plot=true)
-              i[1] = i[1] + 1
-            catch
-              continue
-            end
-          end
-        shell: julia {0}
-      - name:  Test using "test/test_2_accuracy.jl"
-        run: julia -e 'include("test/test_2_accuracy.jl")'
+      - name:  Test 1 iteration and plot
+        run: julia -e 'include("test/test_CI.jl"); fun_sim_impute_check(P_missing_pools=0.5, P_missing_loci=0.5, n_int_number_of_iterations=1)'
+      - name:  Test 10 iterations and assess accuracy
+        run: julia -e 'include("test/test_CI.jl"); fun_sim_impute_check(P_missing_pools=0.1, P_missing_loci=0.1, n_int_number_of_iterations=10)'
