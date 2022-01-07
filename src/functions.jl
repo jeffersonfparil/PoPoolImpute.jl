@@ -201,7 +201,7 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
 end
 
 ### Single-threaded impuataion
-function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx")
+function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true)
     ###################################################################
     ### TEST
     # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
@@ -210,6 +210,8 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
     # n_flt_maximum_fraction_of_pools_with_missing = 0.5
     # n_flt_maximum_fraction_of_loci_with_missing = 0.5
     # str_filename_output = "output-imputed.syncx"
+    # n_bool_skip_leading_window = true
+    # n_bool_skip_trailing_window = true
     ###################################################################
     ### Count the number of loci, alleles, and pools (check if we have the expected number of columns in the first line of the pileup file, i.e. each pool has 3 columns each)
     n_int_total_loci = countlines(str_filename_input)
@@ -303,11 +305,23 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 ### Save the file per window because it's nice to have the output written into disk rather than memory in case anything unsavory happens prior to finishing the entire job - then at least we'll have a partial output rather than nothing at all
                 if (n_int_start_locus >= 2)
                     ### Save a locus once we're done with the trailing end of the previous window
-                    fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
-                                       vec_int_POSITION[1],
-                                       mat_int_ALLELE_COUNTS[1:n_int_allele_count, :],
-                                       n_int_allele_count,
-                                       str_filename_output)
+                    if !n_bool_skip_leading_window
+                        ### save leading window
+                        fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
+                                        vec_int_POSITION[1],
+                                        mat_int_ALLELE_COUNTS[1:n_int_allele_count, :],
+                                        n_int_allele_count,
+                                        str_filename_output)
+                    else
+                        ### do not save the leading window
+                        if n_int_start_locus > (n_int_window_size+1)
+                            fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
+                                        vec_int_POSITION[1],
+                                        mat_int_ALLELE_COUNTS[1:n_int_allele_count, :],
+                                        n_int_allele_count,
+                                        str_filename_output)
+                        end
+                    end
                 end
                 ### Update the matrix of allele counts, and vectors of loci coordinates with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
                 if n_int_new_loci_count < n_int_window_size
@@ -326,12 +340,15 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 end
                 ### If we reach the end of the file offset by one window then save the last window
                 if n_int_start_locus == ((n_int_total_loci-n_int_window_size) + 1)
-                    for i in 1:length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD)
-                        fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[i],
-                                        vec_int_POSITION[i],
-                                        mat_int_ALLELE_COUNTS[(((i-1)*n_int_allele_count)+1):(i*n_int_allele_count), :],
-                                        n_int_allele_count,
-                                        str_filename_output)
+                    ### save trailing window
+                    if !n_bool_skip_trailing_window
+                        for i in 1:length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD)
+                            fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[i],
+                                            vec_int_POSITION[i],
+                                            mat_int_ALLELE_COUNTS[(((i-1)*n_int_allele_count)+1):(i*n_int_allele_count), :],
+                                            n_int_allele_count,
+                                            str_filename_output)
+                        end
                     end
                 end
             end

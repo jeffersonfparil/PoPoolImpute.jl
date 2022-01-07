@@ -88,12 +88,13 @@ The imputed allele counts are averaged across the windows sliding one locus at a
 function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_int_thread_count=2)
     ###################################################################
     ### TEST
-    # str_filename_input = "test.pileup"
+    # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
+    # str_filename_input = "out_simissing.pileup"
     # n_int_window_size = 10
     # n_flt_maximum_fraction_of_pools_with_missing = 0.5
     # n_flt_maximum_fraction_of_loci_with_missing = 0.5
     # str_filename_output = "output-imputed.syncx"
-    # n_int_thread_count = 2
+    # n_int_thread_count = 3
     ###################################################################
     ### Opening remark
     println("")
@@ -129,18 +130,34 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
         n_int_chunk_count = Int(floor(n_int_total_loci / (2*n_int_window_size)))
         n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_chunk_count))
     end
-    println(string("The input file was split into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " loci each (at most)."))
-    ### Cut up the input file
-    open(str_filename_input) do FILE
-        for i in 1:n_int_chunk_count
-            j = 0
-            file = open(string(str_filename_input, "-CHUNK_", i), "w")
-            while (j < n_int_chuck_size) & (!eof(FILE))
-                j += 1
-                line = readline(FILE)
-                write(file, string(line, '\n'))
+    ### Split the input pileup file if we want more than one chunk
+    if n_int_chunk_count > 1
+        println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " loci each (at most)."))
+        ### Cut up the input file and add headers and tail so that we get average imputated frequencies across sliding windows seamlessly
+        open(str_filename_input) do FILE
+            for i in 1:n_int_chunk_count
+                j = 0 ### locus counter per chunk
+                while (j < n_int_chuck_size) & (!eof(FILE))
+                    j += 1
+                    line = readline(FILE)
+                    ### fill up current chunk
+                    file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
+                    write(file_current, string(line, '\n'))
+                    close(file_current)
+                    ### add header (n_int_window_size) of the current chunk as the tail to previous chunk
+                    if (j <= n_int_window_size) & (i > 1)
+                        file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a")
+                        write(file_previous, string(line, '\n'))
+                        close(file_previous)
+                    end
+                    ### add tail (n_int_window_size) of current chunk as the header to next chunk
+                    if (j >= (n_int_chuck_size-(n_int_window_size-1))) & (i < n_int_chunk_count)
+                        file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a")
+                        write(file_next, string(line, '\n'))
+                        close(file_next)
+                    end
+                end
             end
-            close(file)
         end
     end
     println("Imputing.")
@@ -151,34 +168,41 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
         @time _ = @sync @showprogress @distributed for i in 1:n_int_chunk_count
             str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
             str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
+            n_bool_skip_leading_window = i>1
+            n_bool_skip_trailing_window = i<n_int_chunk_count
             fun_single_threaded_imputation(str_filename_chunk_input,
                                 n_int_window_size=n_int_window_size,
                                 n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
                                 n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
-                                str_filename_output=str_filename_chunk_output)
+                                str_filename_output=str_filename_chunk_output,
+                                n_bool_skip_leading_window=n_bool_skip_leading_window,
+                                n_bool_skip_trailing_window=n_bool_skip_trailing_window)
         end
     else
         println("Single-threaded imputation.")
-        i = 1
-        fun_single_threaded_imputation(str_filename_chunk_input,
+        fun_single_threaded_imputation(str_filename_input,
                                 n_int_window_size=n_int_window_size,
                                 n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
                                 n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
-                                str_filename_output=str_filename_chunk_output)
+                                str_filename_output=str_filename_output,
+                                n_bool_skip_leading_window=false,
+                                n_bool_skip_trailing_window=false)
     end
     ### Concatenate chunks
     ### NOTE: The issue here is that the imputed frequencies in the first and last windows were averaged from less imputation data points
-    open(str_filename_output, "w") do FILE_OUT
-        for i in 1:n_int_chunk_count
-            file = open(string(str_filename_output, "-CHUNK_", i), "r")
-            while !eof(file)
-                line = readline(file)
-                write(FILE_OUT, string(line, '\n'))
+    if n_int_chunk_count > 1
+        open(str_filename_output, "w") do FILE_OUT
+            for i in 1:n_int_chunk_count
+                str_filename_chunk = string(str_filename_output, "-CHUNK_", i)
+                file = open(str_filename_chunk, "r")
+                while !eof(file)
+                    write(FILE_OUT, string(readline(file), '\n'))
+                end
+                close(file)
+                ### Clean-up
+                rm(string(str_filename_input, "-CHUNK_", i))
+                rm(string(str_filename_output, "-CHUNK_", i))
             end
-            close(file)
-            ### Clean-up
-            rm(string(str_filename_input, "-CHUNK_", i))
-            rm(string(str_filename_output, "-CHUNK_", i))
         end
     end
     ### Closing remark
