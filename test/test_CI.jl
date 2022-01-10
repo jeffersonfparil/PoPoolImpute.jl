@@ -17,7 +17,7 @@ cd("test/")
 ################################
 
 ### Simulate missing loci, impute, load imputation output, and check imputation accuracy
-function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_int_number_of_iterations=1)
+function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, n_int_number_of_iterations=1)
     ### Uncompress test pileup file
     run(`time tar -xvf test.pileup.tar.xz`)
     ### Initialise output vectors
@@ -27,7 +27,8 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_int_nu
     t = 0
     while t < n_int_number_of_iterations
         ### Simulate 10% missing loci in 10% of the pools
-        run(`time ./2_simulate_missing_loci_in_pileup_file.sh -f test.pileup -p $P_missing_pools -l $P_missing_loci`)
+        # run(`time ./2_simulate_missing_loci_in_pileup_file.sh -f test.pileup -p $P_missing_pools -l $P_missing_loci`)
+        run(`time ./3_simulate_missing_loci_in_pileup_file-IMPROVEMENT.sh -f test.pileup -p $P_missing_pools -l $P_missing_loci -r $n_sequencing_read_length`)
         ### Input and ouput files
         str_filename_withMissing = "out_simissing.pileup"
         str_filename_output = string("output-imputed-", time(),".syncx")
