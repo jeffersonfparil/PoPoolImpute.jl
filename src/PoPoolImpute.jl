@@ -132,7 +132,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     end
     ### Split the input pileup file if we want more than one chunk
     if n_int_chunk_count > 1
-        println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " loci each (at most)."))
+        println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " + 2x", n_int_window_size, " loci each (at most)."))
         ### Cut up the input file and add headers and tail so that we get average imputated frequencies across sliding windows seamlessly
         open(str_filename_input) do FILE
             for i in 1:n_int_chunk_count
