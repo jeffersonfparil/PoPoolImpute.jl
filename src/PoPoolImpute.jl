@@ -137,26 +137,26 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
         open(str_filename_input) do FILE
             for i in 1:n_int_chunk_count
                 j = 0 ### locus counter per chunk
+                file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
+                i > 1                 ? file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a") : nothing
+                i < n_int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing
                 while (j < n_int_chuck_size) & (!eof(FILE))
                     j += 1
                     line = readline(FILE)
                     ### fill up current chunk
-                    file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
                     write(file_current, string(line, '\n'))
-                    close(file_current)
                     ### add header (n_int_window_size) of the current chunk as the tail to previous chunk
                     if (j <= n_int_window_size) & (i > 1)
-                        file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a")
                         write(file_previous, string(line, '\n'))
-                        close(file_previous)
                     end
                     ### add tail (n_int_window_size) of current chunk as the header to next chunk
                     if (j >= (n_int_chuck_size-(n_int_window_size-1))) & (i < n_int_chunk_count)
-                        file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a")
                         write(file_next, string(line, '\n'))
-                        close(file_next)
                     end
                 end
+                close(file_current)
+                i > 1                 ? close(file_previous) : nothing
+                i < n_int_chunk_count ? close(file_next) :     nothing
             end
         end
     end
