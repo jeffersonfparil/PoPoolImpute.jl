@@ -280,7 +280,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 vec_bool_idx_loci_new_loci_to_add = .!vec_bool_idx_loci_existing_loci
                 ### Do we have more than 1 new loci (happens if we skip loci due to the inability to impute because of too many missing data)
                 n_int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
-                ### if we have imputed allele counts, then use the average of the imputed allele counts
+                ### If we have imputed allele counts, then use the average of the imputed allele counts
                 if mat_imputed != "Not missing but no imputation needed since no loci were missing."
                     if n_int_new_loci_count < n_int_window_size
                         ### Compute the average imputed allele counts by updating the average given new imputed allele counts
@@ -305,7 +305,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 ### Save the file per window because it's nice to have the output written into disk rather than memory in case anything unsavory happens prior to finishing the entire job - then at least we'll have a partial output rather than nothing at all
                 if (n_int_start_locus >= 2)
                     ### Save a locus once we're done with the trailing end of the previous window
-                    if !n_bool_skip_leading_window
+                    if n_bool_skip_leading_window == false
                         ### save leading window
                         fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
                                         vec_int_POSITION[1],
@@ -325,6 +325,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 end
                 ### Update the matrix of allele counts, and vectors of loci coordinates with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
                 if n_int_new_loci_count < n_int_window_size
+                    ### If the new and old windows overlap as expected with sliding windows, then update the "mat_int_window_counts" according to the extent of the overlap
                     mat_int_ALLELE_COUNTS[1:(end-(n_int_allele_count*n_int_new_loci_count)), :] = mat_int_ALLELE_COUNTS[((n_int_allele_count*n_int_new_loci_count)+1):end, :]
                     mat_int_ALLELE_COUNTS[((end-(n_int_allele_count*n_int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :]
                     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-n_int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(n_int_new_loci_count+1):end]
@@ -332,7 +333,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                     vec_int_POSITION[1:(end-n_int_new_loci_count)] = vec_int_POSITION[(n_int_new_loci_count+1):end]
                     vec_int_POSITION[((end-n_int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
                 else
-                    ### If none of the old and new windows overlap, i.e. when "mat_int_window_counts" loci were skipped because of too much missing data which rendered imputation impossible,
+                    ### If the old and new windows do not overlap, i.e. when "mat_int_window_counts" loci were skipped because of too much missing data which rendered imputation impossible,
                     ### then replace the matrix of allele counts, and vectors of loci coordinates with the new loci
                     mat_int_ALLELE_COUNTS[1:end,:] = mat_int_window_counts
                     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:end] = vec_str_name_of_chromosome_or_scaffold
@@ -341,7 +342,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 ### If we reach the end of the file offset by one window then save the last window
                 if n_int_start_locus == ((n_int_total_loci-n_int_window_size) + 1)
                     ### save trailing window
-                    if !n_bool_skip_trailing_window
+                    if n_bool_skip_trailing_window == false
                         for i in 1:length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD)
                             fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[i],
                                             vec_int_POSITION[i],

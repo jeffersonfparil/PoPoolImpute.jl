@@ -130,46 +130,53 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
         n_int_chunk_count = Int(floor(n_int_total_loci / (2*n_int_window_size)))
         n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_chunk_count))
     end
-    ### Split the input pileup file if we want more than one chunk
+    ### Split the input pileup file if we can afford parallel processing, i.e. (n_int_thread_count > 1) since (n_int_thread_count = n_int_chunk_count)
     if n_int_chunk_count > 1
         println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " + 2x", n_int_window_size, " loci each (at most)."))
-        ### Cut up the input file and add headers and tail so that we get average imputated frequencies across sliding windows seamlessly
+        ### Cut up the input file and add leading and/or trailing windows so that we get average imputated frequencies across sliding windows seamlessly
         open(str_filename_input) do FILE
+            ### Iterate across each line of the input file
             for i in 1:n_int_chunk_count
                 j = 0 ### locus counter per chunk
+                ### Open the chunk files (classified as the current, previous, and next chunks in order to append their respective leading and/or trailing windows)
                 file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
-                i > 1                 ? file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a") : nothing
-                i < n_int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing
+                i > 1                 ? file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a") : nothing ### first chunk does not have a leading window
+                i < n_int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing ### last chunk does not have trailing window
+                ### Write the line into each chunk file until we reach the chunk size (up to a maximum of chunk size + 2 x window size; accounting for the leading and/or tailing windows)
                 while (j < n_int_chuck_size) & (!eof(FILE))
                     j += 1
                     line = readline(FILE)
                     ### fill up current chunk
                     write(file_current, string(line, '\n'))
-                    ### add header (n_int_window_size) of the current chunk as the tail to previous chunk
+                    ### add leading window of the current chunk as the trailing window of previous chunk
                     if (j <= n_int_window_size) & (i > 1)
+                        ### Note that the first chunk does not have a leading window
                         write(file_previous, string(line, '\n'))
                     end
-                    ### add tail (n_int_window_size) of current chunk as the header to next chunk
+                    ### add trailing window of current chunk as the leading window of the next chunk
                     if (j >= (n_int_chuck_size-(n_int_window_size-1))) & (i < n_int_chunk_count)
+                        ### Note that the last chunk does not have trailing window
                         write(file_next, string(line, '\n'))
                     end
                 end
+                ### close the chunk files
                 close(file_current)
-                i > 1                 ? close(file_previous) : nothing
-                i < n_int_chunk_count ? close(file_next) :     nothing
+                i > 1                 ? close(file_previous) : nothing ### first chunk does not have a leading window
+                i < n_int_chunk_count ? close(file_next) :     nothing ### last chunk does not have trailing window
             end
         end
     end
     println("Imputing.")
     @show n_int_thread_count
     if n_int_thread_count > 1
-        ### Parallel for-loop
+        ### Parallel for-loop for each chunk of the split input file
         println("Multi-threaded imputation.")
         @time _ = @sync @showprogress @distributed for i in 1:n_int_chunk_count
             str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
             str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
-            n_bool_skip_leading_window = i>1
-            n_bool_skip_trailing_window = i<n_int_chunk_count
+            ### Trim-out the leading and/or trailing windows
+            n_bool_skip_leading_window = i>1 ### first chunk does not have a leading window
+            n_bool_skip_trailing_window = i<n_int_chunk_count ### last chunk does not have trailing window
             fun_single_threaded_imputation(str_filename_chunk_input,
                                 n_int_window_size=n_int_window_size,
                                 n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
@@ -179,6 +186,7 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                                 n_bool_skip_trailing_window=n_bool_skip_trailing_window)
         end
     else
+        ### Non-parallel imputation for unsplit input file
         println("Single-threaded imputation.")
         fun_single_threaded_imputation(str_filename_input,
                                 n_int_window_size=n_int_window_size,
@@ -189,7 +197,6 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                                 n_bool_skip_trailing_window=false)
     end
     ### Concatenate chunks
-    ### NOTE: The issue here is that the imputed frequencies in the first and last windows were averaged from less imputation data points
     if n_int_chunk_count > 1
         open(str_filename_output, "w") do FILE_OUT
             for i in 1:n_int_chunk_count
