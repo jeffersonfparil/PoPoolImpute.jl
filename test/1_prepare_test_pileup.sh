@@ -132,6 +132,7 @@ chmod +x align.sh
 
 echo "#####################################"
 echo "### Align single-end Drosophila reads"
+time \
 parallel \
         ./align.sh \
                 Drosophila-Wei-etal-2017/Drosophila_reference \
@@ -141,6 +142,7 @@ parallel \
 
 echo "################################"
 echo "### Align paired-end Human reads"
+time \
 parallel --link \
         ./align.sh \
                 Human-DiNatale-etal-2021/Human_reference \
