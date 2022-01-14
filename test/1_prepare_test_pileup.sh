@@ -30,7 +30,7 @@ vdb-config -i ### invoke the interactive mode
 echo "#####################################"
 echo "### Download Drosophila Pool-seq data"
 ### Note: 100 bp single-end reads
-mkdir Drosophila-Wei-etal-2017/ ### https://doi.org/10.1534/genetics.116.197335
+mkdir Drosophila/ ### https://doi.org/10.1534/genetics.116.197335
 ### Note: fasterq-dump is the new software set to replace fastq-dump, but in my opinion it is still immature as it lacks some of the features that fastq-dump has, e.g. --gzip
 time parallel fastq-dump \
                 --gzip \
@@ -38,9 +38,8 @@ time parallel fastq-dump \
                 --readids \
                 --read-filter pass \
                 --dumpbase \
-                --split-files \
                 --clip \
-                --outdir Drosophila-Wei-etal-2017/ \
+                --outdir Drosophila/ \
                 {} :::  SRR4478513 \
                         SRR4478514 \
                         SRR4478515 \
@@ -52,8 +51,20 @@ time parallel fastq-dump \
 
 echo "##########################################"
 echo "### Download Human caner Pool-seq data ###"
-### Note: 100 bp paired-end reads
-mkdir Human-DiNatale-etal-2021/ ### https://dx.doi.org/10.52733%2FKCJ18n2.a1
+### Note: supposedly 100 bp paired-end reads but failing to align to the human reference genome
+mkdir Human/ ### https://dx.doi.org/10.52733%2FKCJ18n2.a1
+time parallel fastq-dump \
+                --gzip \
+                --skip-technical \
+                --readids \
+                --read-filter pass \
+                --dumpbase \
+                --clip \
+                --outdir Human/ \
+                {} :::  SRR11801598 SRR11801609 SRR11801624 SRR11801627 SRR11801633 \
+                        SRR11801634 SRR11801635 SRR11801636 SRR11801640 SRR11801642
+
+#@@ Alternative data set from https://www.mdpi.com/2075-1729/12/1/41/htm
 time parallel fastq-dump \
                 --gzip \
                 --skip-technical \
@@ -62,18 +73,23 @@ time parallel fastq-dump \
                 --dumpbase \
                 --split-files \
                 --clip \
-                --outdir Human-DiNatale-etal-2021/ \
-                {} :::  SRR11801595 SRR11801596 SRR11801597 SRR11801598 SRR11801599 \
-                        SRR11801600 SRR11801601 SRR11801602 SRR11801603 SRR11801604 \
-                        SRR11801605 SRR11801606 SRR11801607 SRR11801608 SRR11801609 \
-                        SRR11801610 SRR11801611 SRR11801612 SRR11801613 SRR11801614 \
-                        SRR11801615 SRR11801616 SRR11801617 SRR11801618 SRR11801619 \
-                        SRR11801620 SRR11801621 SRR11801622 SRR11801623 SRR11801624 \
-                        SRR11801625 SRR11801626 SRR11801627 SRR11801628 SRR11801629 \
-                        SRR11801630 SRR11801631 SRR11801632 SRR11801633 SRR11801634 \
-                        SRR11801635 SRR11801636 SRR11801637 SRR11801638 SRR11801639 \
-                        SRR11801640 SRR11801641 SRR11801642
+                --outdir TEST-HUMAN-ALT/ \
+                {} ::: DRR309384 \
+                       DRR309385 \
+                       DRR309386 \
+                       DRR309387 \
+                       DRR309388 \
+                       DRR309389
 
+echo '#!/bin/bash
+f=$1
+gunzip -c $f | \
+sed -E "s/^((@|\+)DRR[^.]+\.[^.]+)\.(1|2)/\1/" | \
+gzip -c > ${f%.fastq.gz*}-fixed.fastq.gz
+' > fix_paired_end_read_names.sh
+chmod +x fix_paired_end_read_names.sh
+time \
+parallel ./fix_paired_end_read_names.sh {} ::: $(ls TEST-HUMAN-ALT/*.fastq.gz)
 
 
 echo "##################################"
@@ -89,7 +105,7 @@ echo "Release 6 plus ISO1 mitochondrial genome"
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/215/GCF_000001215.4_Release_6_plus_ISO1_MT/GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna.gz
 gunzip GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna.gz
 mv  GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna \
-        Drosophila-Wei-etal-2017/Drosophila_reference.fasta
+        Drosophila/Drosophila_reference.fasta
 
 echo "###################################"
 echo "### Download Human reference genome"
@@ -98,7 +114,7 @@ echo "Genome Reference Consortium Human Build 38 patch release 13 (GRCh38.p13)"
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.fna.gz
 gunzip GCF_000001405.39_GRCh38.p13_genomic.fna.gz
 mv GCF_000001405.39_GRCh38.p13_genomic.fna \
-        Human-DiNatale-etal-2021/Human_reference.fasta
+        Human/Human_reference.fasta
 
 
 
@@ -135,23 +151,31 @@ echo "### Align single-end Drosophila reads"
 time \
 parallel \
         ./align.sh \
-                Drosophila-Wei-etal-2017/Drosophila_reference \
+                Drosophila/Drosophila_reference \
                 40 \
                 {1} \
-                ::: $(ls Drosophila-Wei-etal-2017/*.fastq.gz)
+                ::: $(ls Drosophila/*.fastq.gz)
 
 echo "################################"
 echo "### Align paired-end Human reads"
 time \
+parallel \
+        ./align.sh \
+                Human/Human_reference \
+                40 \
+                {1} \
+                ::: $(ls Human/*.fastq.gz)
+
+### Alternative
+time \
 parallel --link \
         ./align.sh \
-                Human-DiNatale-etal-2021/Human_reference \
+                Human/Human_reference \
                 40 \
                 {1} \
                 {2} \
-                ::: $(ls Human-DiNatale-etal-2021/*.fastq.gz | grep _pass_1) \
-                ::: $(ls Human-DiNatale-etal-2021/*.fastq.gz | grep _pass_2)
-
+                ::: $(ls TEST-HUMAN-ALT/*_pass_1-fixed.fastq.gz) \
+                ::: $(ls TEST-HUMAN-ALT/*_pass_2-fixed.fastq.gz)
 
 
 echo "#############################"
@@ -160,18 +184,28 @@ echo "### Pileup the alignments ###"
 echo "###                       ###"
 echo "#############################"
 ### List the bam files
-for DIR in Drosophila-Wei-etal-2017 Human-DiNatale-etal-2021
+for d in Drosophila Human
 do
-        ls ${DIR}/*.bam > ${DIR}/Drosophila_bam_list.txt
+        ls ${d}/*.bam > ${d}/${d}_bam_list.txt
 done
 ### Pileup the bam files
 time \
 parallel \
         samtools mpileup \
-        -b {1}*/{1}_bam_list.txt \
+        -b {1}/{1}_bam_list.txt \
         -d 100000 \
         -q 40 \
         -Q 40 \
-        -f {1}_reference \
-        -o {1}*/{1}.mpileup \
+        -f {1}/{1}_reference.fasta \
+        -o {1}/{1}.mpileup \
         ::: Drosophila Human
+
+d=TEST-HUMAN-ALT
+ls ${d}/*.bam > ${d}/${d}_bam_list.txt
+samtools mpileup \
+        -b ${d}/${d}_bam_list.txt \
+        -d 100000 \
+        -q 40 \
+        -Q 40 \
+        -f Human/Human_reference.fasta \
+        -o ${d}/${d}.mpileup \
