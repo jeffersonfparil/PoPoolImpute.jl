@@ -8,10 +8,12 @@ using Dates ### included in base julia installation as part of the standard libr
 ### Load the functions, and move them into scope
 include("functions.jl")
 using .functions: fun_ascii_allele_states_to_counts_per_locus,
-                                fun_ascii_allele_states_to_counts_per_window, 
-                                fun_impute_per_window, 
+                                fun_ascii_allele_states_to_counts_per_window,
+                                fun_impute_per_window,
                                 fun_simple_progress_bar,
-                                fun_writeout_inrun, 
+                                fun_split_pileup,
+                                fun_writeout_inrun,
+                                fun_filter_pileup,
                                 fun_single_threaded_imputation
 ### Documentation
 """
@@ -132,39 +134,11 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     end
     ### Split the input pileup file if we can afford parallel processing, i.e. (n_int_thread_count > 1) since (n_int_thread_count = n_int_chunk_count)
     if n_int_chunk_count > 1
-        println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " + 2x", n_int_window_size, " loci each (at most)."))
-        ### Cut up the input file and add leading and/or trailing windows so that we get average imputated frequencies across sliding windows seamlessly
-        open(str_filename_input) do FILE
-            ### Iterate across each line of the input file
-            for i in 1:n_int_chunk_count
-                j = 0 ### locus counter per chunk
-                ### Open the chunk files (classified as the current, previous, and next chunks in order to append their respective leading and/or trailing windows)
-                file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
-                i > 1                 ? file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a") : nothing ### first chunk does not have a leading window
-                i < n_int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing ### last chunk does not have trailing window
-                ### Write the line into each chunk file until we reach the chunk size (up to a maximum of chunk size + 2 x window size; accounting for the leading and/or tailing windows)
-                while (j < n_int_chuck_size) & (!eof(FILE))
-                    j += 1
-                    line = readline(FILE)
-                    ### fill up current chunk
-                    write(file_current, string(line, '\n'))
-                    ### add leading window of the current chunk as the trailing window of previous chunk
-                    if (j <= n_int_window_size) & (i > 1)
-                        ### Note that the first chunk does not have a leading window
-                        write(file_previous, string(line, '\n'))
-                    end
-                    ### add trailing window of current chunk as the leading window of the next chunk
-                    if (j >= (n_int_chuck_size-(n_int_window_size-1))) & (i < n_int_chunk_count)
-                        ### Note that the last chunk does not have trailing window
-                        write(file_next, string(line, '\n'))
-                    end
-                end
-                ### close the chunk files
-                close(file_current)
-                i > 1                 ? close(file_previous) : nothing ### first chunk does not have a leading window
-                i < n_int_chunk_count ? close(file_next) :     nothing ### last chunk does not have trailing window
-            end
-        end
+        fun_split_pileup(str_filename_input,
+                         n_int_chunk_count=n_int_chunk_count,
+                         n_int_chuck_size=n_int_chuck_size,
+                         n_int_window_size=n_int_window_size,
+                         n_bool_add_leading_trailing_windows=true)
     end
     println("Imputing.")
     @show n_int_thread_count

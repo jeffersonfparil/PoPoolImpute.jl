@@ -105,3 +105,13 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_sequen
     ### Output
     return(0)
 end
+
+
+### MISC: USING OTHER DATASETS
+### Filter pileups to include no missing data
+# vec_str_pileup = ["Drosophila/Drosophila.mpileup",
+#                   "Human/Human.mpileup",
+#                   "TEST-HUMAN-ALT/TEST-HUMAN-ALT.mpileup"]
+# for str_pileup in vec_str_pileup
+#     PoPoolImpute.fun_filter_pileup(str_pileup)
+# end

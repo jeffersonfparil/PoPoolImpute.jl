@@ -183,6 +183,61 @@ function fun_simple_progress_bar(n_int_current, n_int_max, n_int_length=50)
     end
 end
 
+### split pileup file into chunks
+function fun_split_pileup(str_filename_input; n_int_chunk_count=2, n_int_chuck_size=1e6, n_int_window_size=100, n_bool_add_leading_trailing_windows=true)
+    ######################
+    ### TEST
+    # str_filename_input = "test.pileup"
+    # n_int_chunk_count = 2
+    # n_int_chuck_size = 20
+    # n_int_window_size = 10
+    # n_bool_add_leading_trailing_windows = true
+    ######################
+    println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " + 2x", n_int_window_size, " loci each (at most)."))
+    ### Cut up the input file and add leading and/or trailing windows so that we get average imputated frequencies across sliding windows seamlessly
+    open(str_filename_input) do FILE
+        ### Split into chunks if we are to split the pileup into more than 1 chunk
+        if n_int_chunk_count > 1
+            for i in 1:n_int_chunk_count
+                j = 0 ### locus counter per chunk
+                ### Open the chunk files (classified as the current, previous, and next chunks in order to append their respective leading and/or trailing windows)
+                file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
+                if n_bool_add_leading_trailing_windows
+                    i > 1                 ? file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a") : nothing ### first chunk does not have a leading window
+                    i < n_int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing ### last chunk does not have trailing window
+                end
+                ### Write the line into each chunk file until we reach the chunk size (up to a maximum of chunk size + 2 x window size; accounting for the leading and/or tailing windows)
+                while (j < n_int_chuck_size) & (!eof(FILE))
+                    j += 1
+                    line = readline(FILE)
+                    ### fill up current chunk
+                    write(file_current, string(line, '\n'))
+                    if n_bool_add_leading_trailing_windows
+                        ### add leading window of the current chunk as the trailing window of previous chunk
+                        if (j <= n_int_window_size) & (i > 1)
+                            ### Note that the first chunk does not have a leading window
+                            write(file_previous, string(line, '\n'))
+                        end
+                        ### add trailing window of current chunk as the leading window of the next chunk
+                        if (j >= (n_int_chuck_size-(n_int_window_size-1))) & (i < n_int_chunk_count)
+                            ### Note that the last chunk does not have trailing window
+                            write(file_next, string(line, '\n'))
+                        end
+                    end
+                end
+                ### close the chunk files
+                close(file_current)
+                if n_bool_add_leading_trailing_windows
+                    i > 1                 ? close(file_previous) : nothing ### first chunk does not have a leading window
+                    i < n_int_chunk_count ? close(file_next) :     nothing ### last chunk does not have trailing window
+                end
+            end
+        else
+            println("No splitting required because we have 1 chunk!")
+        end
+    end
+end
+
 ### Write file into disk (for writing the output one locus at a time as the imputation algorithm runs iteratively across sliding windows)
 function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSITION, mat_int_ALLELE_COUNTS, n_int_allele_count, str_filename_output)
     if !isa(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, Array)
@@ -198,6 +253,26 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
     file = open(str_filename_output, "a")
     write(file, string(out, '\n'))
     close(file)
+end
+
+### filter pileup file: remove loci with at least 1 missing data point
+function fun_filter_pileup(str_filename_input)
+    ######################
+    ### TEST
+    # str_filename_input = "test.pileup"
+    ######################
+    file_filter_pileup = open(string(str_filename_input, "-FILTERED.pileup"), "w")
+    open(str_filename_input) do FILE
+        while !eof(FILE)
+            line = readline(FILE)
+            vec_counts_quality = split(line, '\t')[4:end]
+            n_bool_locus_no_depth_in_at_least_1_pool = sum(parse.(Int, vec_counts_quality[collect(1:3:length(vec_counts_quality))]) .== 0) >= 1
+            if n_bool_locus_no_depth_in_at_least_1_pool == false
+                write(file_filter_pileup, string(line, '\n'))
+            end
+        end
+    end
+    close(file_filter_pileup)
 end
 
 ### Single-threaded impuataion
