@@ -51,20 +51,8 @@ time parallel fastq-dump \
 
 echo "##########################################"
 echo "### Download Human caner Pool-seq data ###"
-### Note: supposedly 100 bp paired-end reads but failing to align to the human reference genome
-mkdir Human/ ### https://dx.doi.org/10.52733%2FKCJ18n2.a1
-time parallel fastq-dump \
-                --gzip \
-                --skip-technical \
-                --readids \
-                --read-filter pass \
-                --dumpbase \
-                --clip \
-                --outdir Human/ \
-                {} :::  SRR11801598 SRR11801609 SRR11801624 SRR11801627 SRR11801633 \
-                        SRR11801634 SRR11801635 SRR11801636 SRR11801640 SRR11801642
-
-#@@ Alternative data set from https://www.mdpi.com/2075-1729/12/1/41/htm
+### Note: 100 bp paired-end exome sequencing reads
+mkdir Human/ ### https://www.mdpi.com/2075-1729/12/1/41/htm
 time parallel fastq-dump \
                 --gzip \
                 --skip-technical \
@@ -80,7 +68,7 @@ time parallel fastq-dump \
                        DRR309387 \
                        DRR309388 \
                        DRR309389
-
+### Fix the automatic read mismatches between reads generated with pulling out the reads with sra-tools
 echo '#!/bin/bash
 f=$1
 gunzip -c $f | \
@@ -90,6 +78,7 @@ gzip -c > ${f%.fastq.gz*}-fixed.fastq.gz
 chmod +x fix_paired_end_read_names.sh
 time \
 parallel ./fix_paired_end_read_names.sh {} ::: $(ls TEST-HUMAN-ALT/*.fastq.gz)
+
 
 
 echo "##################################"
@@ -159,15 +148,6 @@ parallel \
 echo "################################"
 echo "### Align paired-end Human reads"
 time \
-parallel \
-        ./align.sh \
-                Human/Human_reference \
-                40 \
-                {1} \
-                ::: $(ls Human/*.fastq.gz)
-
-### Alternative
-time \
 parallel --link \
         ./align.sh \
                 Human/Human_reference \
@@ -200,12 +180,3 @@ parallel \
         -o {1}/{1}.mpileup \
         ::: Drosophila Human
 
-d=TEST-HUMAN-ALT
-ls ${d}/*.bam > ${d}/${d}_bam_list.txt
-samtools mpileup \
-        -b ${d}/${d}_bam_list.txt \
-        -d 100000 \
-        -q 40 \
-        -Q 40 \
-        -f Human/Human_reference.fasta \
-        -o ${d}/${d}.mpileup \

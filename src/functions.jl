@@ -262,7 +262,7 @@ function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
     # str_filename_input = "test.pileup"
     # flt_maximum_missing = 0.50
     ######################
-    file_filter_pileup = open(string(str_filename_input, "-FILTERED.pileup"), "w")
+    file_filter_pileup = open(string(str_filename_input, "-FILTERED_", flt_maximum_missing,".pileup"), "w")
     int_maximum_missing_threshold = -1
     open(str_filename_input) do FILE
         while !eof(FILE)
@@ -280,7 +280,7 @@ function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
     close(file_filter_pileup)
 end
 
-### Single-threaded impuataion
+### Single-threaded imputaion
 function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true)
     ###################################################################
     ### TEST
@@ -441,5 +441,8 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
     ### Return zero to indicate that all is well
     return(0)
 end
+
+### add a function to mesuare variation in the syncx file
+
 
 end
