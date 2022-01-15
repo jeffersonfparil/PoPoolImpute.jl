@@ -109,11 +109,12 @@ end
 
 ### MISC: USING OTHER DATASETS
 ### Filter pileups to include no missing data
-vec_str_pileup = ["Drosophila/Drosophila.mpileup",
-                  "Human/Human.mpileup"]
-for str_pileup in vec_str_pileup
-    PoPoolImpute.fun_filter_pileup(str_pileup)
-end
+# vec_str_pileup = ["Drosophila/Drosophila.mpileup",
+#                   "Human/Human.mpileup"]
+# for str_pileup in vec_str_pileup
+#     PoPoolImpute.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
+#     PoPoolImpute.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
+# end
 ### Results:
 ###     - Human/Human.mpileup has nothing! Literally no mapped reads! 
 ###     - Drosophila/Drosophila.mpileup has a lot of 50% missing data on some pools.
