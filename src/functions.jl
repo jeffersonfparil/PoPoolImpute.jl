@@ -256,18 +256,23 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
 end
 
 ### filter pileup file: remove loci with at least 1 missing data point
-function fun_filter_pileup(str_filename_input)
+function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
     ######################
     ### TEST
     # str_filename_input = "test.pileup"
+    # flt_maximum_missing = 0.50
     ######################
     file_filter_pileup = open(string(str_filename_input, "-FILTERED.pileup"), "w")
+    int_maximum_missing_threshold = -1
     open(str_filename_input) do FILE
         while !eof(FILE)
             line = readline(FILE)
             vec_counts_quality = split(line, '\t')[4:end]
-            n_bool_locus_no_depth_in_at_least_1_pool = sum(parse.(Int, vec_counts_quality[collect(1:3:length(vec_counts_quality))]) .== 0) >= 1
-            if n_bool_locus_no_depth_in_at_least_1_pool == false
+            if int_maximum_missing_threshold == -1
+                int_maximum_missing_threshold = ceil(flt_maximum_missing * (length(vec_counts_quality)/3))
+            end
+            n_bool_locus_no_depth_in_more_than_N_pools = sum(parse.(Int, vec_counts_quality[collect(1:3:length(vec_counts_quality))]) .== 0) > int_maximum_missing_threshold
+            if n_bool_locus_no_depth_in_more_than_N_pools == false
                 write(file_filter_pileup, string(line, '\n'))
             end
         end
