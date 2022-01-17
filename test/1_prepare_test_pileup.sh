@@ -29,7 +29,7 @@ vdb-config -i ### invoke the interactive mode
 
 echo "#####################################"
 echo "### Download Drosophila Pool-seq data"
-### Note: 100 bp single-end reads
+### Note: 100 bp single-end reads (some reads were excluded because they were too sparse)
 mkdir Drosophila/ ### https://doi.org/10.1534/genetics.116.197335
 ### Note: fasterq-dump is the new software set to replace fastq-dump, but in my opinion it is still immature as it lacks some of the features that fastq-dump has, e.g. --gzip
 time parallel fastq-dump \
@@ -42,8 +42,6 @@ time parallel fastq-dump \
                 --outdir Drosophila/ \
                 {} :::  SRR4478513 \
                         SRR4478514 \
-                        SRR4478515 \
-                        SRR4478516 \
                         SRR4478517 \
                         SRR4478518 \
                         SRR4478519 \
@@ -61,7 +59,7 @@ time parallel fastq-dump \
                 --dumpbase \
                 --split-files \
                 --clip \
-                --outdir TEST-HUMAN-ALT/ \
+                --outdir Human/ \
                 {} ::: DRR309384 \
                        DRR309385 \
                        DRR309386 \
@@ -77,7 +75,7 @@ gzip -c > ${f%.fastq.gz*}-fixed.fastq.gz
 ' > fix_paired_end_read_names.sh
 chmod +x fix_paired_end_read_names.sh
 time \
-parallel ./fix_paired_end_read_names.sh {} ::: $(ls TEST-HUMAN-ALT/*.fastq.gz)
+parallel ./fix_paired_end_read_names.sh {} ::: $(ls Human/*.fastq.gz)
 
 
 
@@ -154,8 +152,8 @@ parallel --link \
                 40 \
                 {1} \
                 {2} \
-                ::: $(ls TEST-HUMAN-ALT/*_pass_1-fixed.fastq.gz) \
-                ::: $(ls TEST-HUMAN-ALT/*_pass_2-fixed.fastq.gz)
+                ::: $(ls Human/*_pass_1-fixed.fastq.gz) \
+                ::: $(ls Human/*_pass_2-fixed.fastq.gz)
 
 
 echo "#############################"

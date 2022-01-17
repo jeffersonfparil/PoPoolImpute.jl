@@ -442,7 +442,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
     return(0)
 end
 
-### add a function to mesuare variation in the syncx file
+### add a function to measure variation in the syncx file
 
 
 end
