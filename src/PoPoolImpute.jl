@@ -13,8 +13,9 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
                                 fun_simple_progress_bar,
                                 fun_split_pileup,
                                 fun_writeout_inrun,
+                                fun_single_threaded_imputation,
                                 fun_filter_pileup,
-                                fun_single_threaded_imputation
+                                fun_find_coordinates_of_missing_data
 ### Documentation
 """
 # ____________________________________________________________________
@@ -183,9 +184,16 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                     end
                     close(file)
                     ### Clean-up
-                    rm(string(str_filename_input, "-CHUNK_", i))
                     rm(string(str_filename_output, "-CHUNK_", i))
+                else
+                    ### Message when a chunk was not imputed at all because the data is too sparse,
+                    ### where sparsity is discatated by the maximum number of loci and pools allowed to be missing
+                    ### as well as successful parameter estimation of the linear regression model.
+                    println("No imputation output for: ")
+                    println(string(str_filename_input, "-CHUNK_", i))
                 end
+                ### Clean-up
+                rm(string(str_filename_input, "-CHUNK_", i))
             end
         end
     end
