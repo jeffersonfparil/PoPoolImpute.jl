@@ -255,31 +255,6 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
     close(file)
 end
 
-### filter pileup file: remove loci with at least 1 missing data point
-function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
-    ######################
-    ### TEST
-    # str_filename_input = "test.pileup"
-    # flt_maximum_missing = 0.50
-    ######################
-    file_filter_pileup = open(string(str_filename_input, "-FILTERED_", flt_maximum_missing,".pileup"), "w")
-    int_maximum_missing_threshold = -1
-    open(str_filename_input) do FILE
-        while !eof(FILE)
-            line = readline(FILE)
-            vec_counts_quality = split(line, '\t')[4:end]
-            if int_maximum_missing_threshold == -1
-                int_maximum_missing_threshold = ceil(flt_maximum_missing * (length(vec_counts_quality)/3))
-            end
-            n_bool_locus_no_depth_in_more_than_N_pools = sum(parse.(Int, vec_counts_quality[collect(1:3:length(vec_counts_quality))]) .== 0) > int_maximum_missing_threshold
-            if n_bool_locus_no_depth_in_more_than_N_pools == false
-                write(file_filter_pileup, string(line, '\n'))
-            end
-        end
-    end
-    close(file_filter_pileup)
-end
-
 ### Single-threaded imputaion
 function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true)
     ###################################################################
@@ -344,7 +319,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_with_missing_loci] = mat_imputed
             end
         else
-            mat_imputed = "Not missing but no imputation needed since no loci were missing."
+            mat_imputed = "No imputation needed since no loci were missing."
         end
         ### Add allele counts imputed and non-missing + loci information
         if !ismissing(mat_imputed)
@@ -361,7 +336,7 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                 ### Do we have more than 1 new loci (happens if we skip loci due to the inability to impute because of too many missing data)
                 n_int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
                 ### If we have imputed allele counts, then use the average of the imputed allele counts
-                if mat_imputed != "Not missing but no imputation needed since no loci were missing."
+                if mat_imputed != "No imputation needed since no loci were missing."
                     if n_int_new_loci_count < n_int_window_size
                         ### Compute the average imputed allele counts by updating the average given new imputed allele counts
                         vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(n_int_allele_count*n_int_new_loci_count))]
@@ -442,7 +417,55 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
     return(0)
 end
 
-### add a function to measure variation in the syncx file
+### FUNCTIONS FOR SIMULATING MISSING DATA:
 
+### Filter pileup file: remove loci with at least 1 missing data point
+function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
+    ######################
+    ### TEST
+    # str_filename_input = "test.pileup"
+    # flt_maximum_missing = 0.50
+    ######################
+    file_filter_pileup = open(string(str_filename_input, "-FILTERED_", flt_maximum_missing,".pileup"), "w")
+    int_maximum_missing_threshold = -1
+    open(str_filename_input) do FILE
+        while !eof(FILE)
+            line = readline(FILE)
+            vec_counts_quality = split(line, '\t')[4:end]
+            if int_maximum_missing_threshold == -1
+                int_maximum_missing_threshold = ceil(flt_maximum_missing * (length(vec_counts_quality)/3))
+            end
+            n_bool_locus_no_depth_in_more_than_N_pools = sum(parse.(Int, vec_counts_quality[collect(1:3:length(vec_counts_quality))]) .== 0) > int_maximum_missing_threshold
+            if n_bool_locus_no_depth_in_more_than_N_pools == false
+                write(file_filter_pileup, string(line, '\n'))
+            end
+        end
+    end
+    close(file_filter_pileup)
+end
+
+### Find coordinates of missing data in the pileup file
+function fun_find_coordinates_of_missing_data(str_filename_withMissing)
+    file_with_missing = open(str_filename_withMissing, "r")
+    vec_int_idx_missing_loci  = []
+    vec_int_idx_missing_pools = []
+    vec_str_missing_loci = []
+    i = 0
+    while !eof(file_with_missing)
+        i += 1
+        line = readline(file_with_missing)
+        vec_str_line = split(line, '\t')
+        vec_str_depth_count_quality = vec_str_line[4:end]
+        vec_bool_missing = parse.(Int, vec_str_depth_count_quality[1:3:end]) .== 0
+        if sum(vec_bool_missing) > 0
+            vec_int_idx_pools = findall(vec_bool_missing)
+            vec_int_idx_locus = repeat([i], length(vec_int_idx_pools))
+            append!(vec_int_idx_missing_loci,  vec_int_idx_locus)
+            append!(vec_int_idx_missing_pools, vec_int_idx_pools)
+            push!(vec_str_missing_loci, join([join(vec_str_line[1:3], ":"), join(vec_int_idx_pools, ":")], ":"))
+        end
+    end
+    return(vec_int_idx_missing_loci, vec_int_idx_missing_pools, vec_str_missing_loci)
+end
 
 end

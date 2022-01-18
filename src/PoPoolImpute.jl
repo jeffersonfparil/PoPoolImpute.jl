@@ -175,14 +175,17 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
         open(str_filename_output, "w") do FILE_OUT
             for i in 1:n_int_chunk_count
                 str_filename_chunk = string(str_filename_output, "-CHUNK_", i)
-                file = open(str_filename_chunk, "r")
-                while !eof(file)
-                    write(FILE_OUT, string(readline(file), '\n'))
+                ### Check if the chunk exists (the chunk file may not exist if no loci were kept)
+                if isfile(str_filename_chunk)
+                    file = open(str_filename_chunk, "r")
+                    while !eof(file)
+                        write(FILE_OUT, string(readline(file), '\n'))
+                    end
+                    close(file)
+                    ### Clean-up
+                    rm(string(str_filename_input, "-CHUNK_", i))
+                    rm(string(str_filename_output, "-CHUNK_", i))
                 end
-                close(file)
-                ### Clean-up
-                rm(string(str_filename_input, "-CHUNK_", i))
-                rm(string(str_filename_output, "-CHUNK_", i))
             end
         end
     end

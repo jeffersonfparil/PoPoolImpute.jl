@@ -67,3 +67,7 @@ Where:
 - **Xₘ** is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: **mₘ** non-missing loci × 7 alleles, **nₚ** pools without missing loci).
 
 The imputed allele counts are averaged across the windows sliding one locus at a time.
+
+# Notes
+
+The current algorithm is agnostic of the distances between markers. We plan on using the distance information as well as test penalised regression, i.e. ridge, regression, LASSO, and elastic-net.
