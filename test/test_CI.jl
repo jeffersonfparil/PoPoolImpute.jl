@@ -97,6 +97,77 @@ function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100,
     return(i)
 end
 
+### filter output syncx file so it contains only the loci with at least 1 imputed datapoint
+function fun_filter_output_syncx(str_filename_output; vec_str_missing_loci)
+    ############################################################################################################
+    ### TEST
+    # str_filename_withMissing = "test_human-SIMULATED_MISSING.pileup"
+    # @time vec_int_idx_missing_loci,
+    #       vec_int_idx_missing_pools,
+    #       vec_str_missing_loci = PoPoolImpute.fun_find_coordinates_of_missing_data(str_filename_withMissing)
+    ############################################################################################################
+    str_filename_syncx_missing_loci_only = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-FILTERED_IMPUTED_LOCI_ONLY.syncx")
+    file_imputed = open(str_filename_output, "r")
+    file_filtered = open(str_filename_syncx_missing_loci_only, "w")
+    i = 1
+    vec_str_imputed_loci = []
+    while !eof(file_imputed)
+        line = readline(file_imputed)
+        vec_str_missing_locus_pool_id = split(vec_str_missing_loci[i], ':')
+        vec_str_imputed_line = split(line, ',')
+        str_scaffold_missing = vec_str_missing_locus_pool_id[1]
+        str_scaffold_imputed = vec_str_imputed_line[1]
+        int_position_missing = parse(Int, vec_str_missing_locus_pool_id[2])
+        int_position_imputed = parse(Int, vec_str_imputed_line[2])
+        ### Assumes imputed file is sorted the same way as the imputation function input pileup file (i.e. with missing data)
+        if str_scaffold_missing == str_scaffold_imputed
+            if int_position_missing == int_position_imputed
+                push!(vec_str_imputed_loci, join([str_scaffold_imputed, int_position_imputed], ":"))
+                write(file_filtered, string(line, '\n'))
+                ### write-out the remaining 6 alleles (A,T,C,G,INS,DEL,N)
+                for j in 1:6
+                    line = readline(file_imputed)
+                    write(file_filtered, string(line, '\n'))
+                end
+                i<length(vec_str_missing_loci) ? i += 1 : i = i
+            end
+            ### skip the originally missing loci if it was not imputed (Note: assumes sorted by postion per scaffold or chromosome)
+            if int_position_missing < int_position_imputed
+                i<length(vec_str_missing_loci) ? i += 1 : i = i
+            end
+        end
+    end
+    close(file_imputed)
+    close(file_filtered)
+    return(str_filename_syncx_missing_loci_only, vec_str_imputed_loci)
+end
+
+### filter original pileup file to contain only the loci simutated to have missing data and were subsequently imputed
+function fun_filter_original_pileup(str_filename_pilelup_no_missing_loci; vec_str_imputed_loci)
+    str_filename_pileup_filtered_imputed_loci = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)]), "-FILTERED_IMPUTED_LOCI_ONLY.pileup")
+    file_orig = open(str_filename_pilelup_no_missing_loci, "r")
+    file_imputed = open(str_filename_pileup_filtered_imputed_loci, "w")
+    i = 1
+    while !eof(file_orig)
+        line = readline(file_orig)
+        vec_str_line = split(line, '\t')
+        str_scaffold_orig = vec_str_line[1]
+        str_position_orig = parse(Int, vec_str_line[2])
+        str_scaffold_imputed = split(vec_str_imputed_loci[i], ':')[1]
+        str_position_imputed = parse(Int, split(vec_str_imputed_loci[i], ':')[2])
+        if str_scaffold_imputed == str_scaffold_orig
+            if str_position_imputed == str_position_orig
+                i<length(vec_str_imputed_loci) ? i += 1 : i = i
+                write(file_imputed, string(line, '\n'))
+            end
+        end
+    end
+    close(file_orig)
+    close(file_imputed)
+    return(str_filename_pileup_filtered_imputed_loci)
+end
+
+
 ### Main test function:
 ###     (1) simulate missing loci,
 ###     (2) impute
@@ -119,7 +190,8 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_sequen
                              n_flt_maximum_fraction_of_loci_with_missing=P_missing_loci,
                              n_flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
                              str_filename_pileup_simulated_missing=str_filename_withMissing)
-        ### Input and ouput files
+        str_filename_output = string("output-imputed-", time(),".syncx")
+        
 
         # ######################################################################################
         # ## TESTING BIGGER DATASETS
@@ -133,7 +205,8 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_sequen
         # Distributed.addprocs(n_int_thread_count)
         # Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
         # @everywhere using PoPoolImpute
-        # @time fun_simulate_missing("test_human.pileup")
+        # str_filename_pilelup_no_missing_loci = "test_human.pileup"
+        # @time fun_simulate_missing(str_filename_pilelup_no_missing_loci)
         # str_filename_withMissing = "test_human-SIMULATED_MISSING.pileup"
         # str_filename_output = string("output-imputed-", time(),".syncx")
         # n_sequencing_read_length = 100
@@ -153,38 +226,58 @@ function fun_sim_impute_check(;P_missing_pools=0.5, P_missing_loci=0.5, n_sequen
         # #       Hence, make sure we have no ":" in the scaffold names
 
         # ### Filter imputed data to include only the loci where some of the data were imputed
-        # str_filename_output_missing_loci_only = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-FILTERED_IMPUTED_LOCI_ONLY.syncx")
-        # file_imputed = open(str_filename_output, "r")
-        # file_filtered = open(str_filename_output_missing_loci_only, "r")
+        # println("Filter the output syncx file to include only the loci with imputed missing data.")
+        # @time str_filename_syncx_missing_loci_only, 
+        #       vec_str_imputed_loci = fun_filter_output_syncx(str_filename_output, vec_str_missing_loci=vec_str_missing_loci)
+    
+        # ### Filter original pileup file without missing data to include only the loci which were imputed after missing data simulation
+        # println("Filter the original pileup file to include only the loci which were simulated to have missing data and were subsequently imputed.")
+        # @time str_filename_pileup_filtered_imputed_loci = fun_filter_original_pileup(str_filename_pilelup_no_missing_loci, vec_str_imputed_loci=vec_str_imputed_loci)
+
+        # ### load true frequencies
+        # @time scaf_WITHOUT_MISSING,
+        #       pos_WITHOUT_MISSING,
+        #       mat_WITHOUT_MISSING = PoPoolImpute.fun_ascii_allele_states_to_counts_per_window(readlines(str_filename_pileup_filtered_imputed_loci))
+
+        # ### load imputed frequencies
+        # X = hcat(split.(readlines(str_filename_syncx_missing_loci_only), ",")...)
+        # vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = X[1,:]
+        # vec_int_POSITION = parse.(Int, X[2,:])
+        # mat_int_ALLELE_COUNTS = parse.(Int, X[3:end,:])'
+
+        # ### keep only the pools (or tcolumns) which refer to the imputed points
         # i = 1
-        # vec_str_imputed_loci = []
-        # while !eof(file_imputed)
-        #     line = readline(file_imputed)
-        #     vec_str_missing_locus_pool_id = split(vec_str_missing_loci[i], ':')
-        #     vec_str_imputed_line = split(line, ',')
-        #     str_scaffold_missing = vec_str_missing_locus_pool_id[1]
-        #     str_scaffold_imputed = vec_str_imputed_line[1]
-        #     int_position_missing = parse(Int, vec_str_missing_locus_pool_id[2])
-        #     int_position_imputed = parse(Int, vec_str_imputed_line[2])
-        #     ### Assumes imputed file is sorted the same way as the imputation function input pileup file (i.e. with missing data)
-        #     if str_scaffold_missing == str_scaffold_imputed
-        #         if int_position_missing == int_position_imputed
-        #             write(file_filtered, string(line, '\n'))
+        # vec_int_freq_true    = []
+        # vec_int_freq_imputed = []
+        # for locus in vec_str_missing_loci
+        #     # locus = vec_str_missing_loci[1]
+        #     vec_str_locus = split(locus, ":")
+        #     str_scaffold = vec_str_locus[1]
+        #     int_postion = parse(Int, vec_str_locus[2])
+
+        #     if (str_scaffold==vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[i]) & (int_postion==vec_int_POSITION[i])
+        #         @show locus
+        #         @show i
+        #         for allele in 1:7
         #             i += 1
-        #         end
-        #         ### skip the originally missing loci if it was not imputed (Note: assumes sorted by postion per scaffold or chromosome)
-        #         if int_position_missing < int_position_imputed
-        #             i += 1
+        #             vec_int_idx_pools = parse.(Int, vec_str_locus[4:end])
+        #             append!(vec_int_freq_true,    mat_WITHOUT_MISSING[i, vec_int_idx_pools])
+        #             append!(vec_int_freq_imputed, mat_int_ALLELE_COUNTS[i, vec_int_idx_pools])
         #         end
         #     end
+
         # end
-        # close(file_imputed)
-        # close(file_filtered)
-    
+
+
+            
+
+
+
+
 
         # ######################################################################################
-
-        str_filename_output = string("output-imputed-", time(),".syncx")
+        
+        
         try
             ### Impute
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
