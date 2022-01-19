@@ -157,11 +157,21 @@ end
 #     PoPoolImpute.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
 #     PoPoolImpute.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
 # end
-
+# #
+# ### Accuracy assessment 
+# using Test
+# using Pkg
+# using ProgressMeter
+# using UnicodePlots
+# using Distributed
+# n_int_thread_count = 30
+# Distributed.addprocs(n_int_thread_count)
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
+# ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
 # @time fun_sim_impute_check("/data-weedomics-1/test_human.pileup",
-#                            window_size=200
-#                            P_missing_pools=0.5
-#                            P_missing_loci=0.5
+#                            window_size=200,
+#                            P_missing_pools=0.5,
+#                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            n_int_number_of_iterations=1)
-
