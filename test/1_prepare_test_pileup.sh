@@ -77,6 +77,59 @@ chmod +x fix_paired_end_read_names.sh
 time \
 parallel ./fix_paired_end_read_names.sh {} ::: $(ls Human/*.fastq.gz)
 
+###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+### MISC: https://www.science.org/doi/10.1126/scitranslmed.aax7392
+### circulating tumor DNA (ctDNA) sequencing
+### NCBI SRA link: https://www.ncbi.nlm.nih.gov/sra?linkname=bioproject_sra_all&from_uid=551456
+mkdir ctDNA/
+time parallel fastq-dump \
+                --gzip \
+                --skip-technical \
+                --readids \
+                --read-filter pass \
+                --dumpbase \
+                --split-files \
+                --clip \
+                --outdir ctDNA/ \
+                {} ::: SRR9603023 \
+                       SRR9603024 \
+                       SRR9603025 \
+                       SRR9603026 \
+                       SRR9603027 \
+                       SRR9603028 \
+                       SRR9603029 \
+                       SRR9603030 \
+                       SRR9603031 \
+                       SRR9603032 \
+                       SRR9603033 \
+                       SRR9603034
+
+### ADDITIONALLY TEST A SMALL SUBSET OF CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup
+FILE_INPUT="CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup"
+NLOCI=$(wc -l ${FILE_INPUT} | cut -d' ' -f1)
+NLOCI_TO_KEEP=25000
+MAX_RANDOM_VALUE=32767 ### according to https://tldp.org/LDP/abs/html/randomvar.html
+touch FILE_RAND.temp
+for i in $(seq 1 $NLOCI_KEEP)
+do
+        echo "( $RANDOM - 0 ) * $NLOCI / $MAX_RANDOM_VALUE" | bc >> FILE_RAND.temp
+done
+
+touch TEST_25000_loci.pileup
+for line in $(sort -n FILE_RAND.temp | uniq)
+do
+        # echo $line
+        sed "${line}q;d" ${FILE_INPUT} >> TEST_25000_loci.pileup
+done
+
+
+###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
 
 
 echo "##################################"
