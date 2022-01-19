@@ -1,9 +1,7 @@
 module PoPoolImpute
 
-### Load linear algebra library for the Moore-Penrose pseudoinverse if the automatic solver fails
-using Distributed
 using ProgressMeter
-using LinearAlgebra
+using Distributed
 using Dates ### included in base julia installation as part of the standard library and so no need to install as a dependency in .github/workflows/julia.yml
 ### Load the functions, and move them into scope
 include("functions.jl")
@@ -13,9 +11,7 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
                                 fun_simple_progress_bar,
                                 fun_split_pileup,
                                 fun_writeout_inrun,
-                                fun_single_threaded_imputation,
-                                fun_filter_pileup,
-                                fun_find_coordinates_of_missing_data
+                                fun_single_threaded_imputation
 ### Documentation
 """
 # ____________________________________________________________________

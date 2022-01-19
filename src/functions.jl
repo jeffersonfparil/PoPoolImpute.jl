@@ -1,5 +1,10 @@
 module functions
 
+using Random
+using ProgressMeter
+using LinearAlgebra ### Load linear algebra library for the Moore-Penrose pseudoinverse if the automatic solver fails
+
+
 ### ACSII to allele state parser per locus
 function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_allele_state, str_reference_allele, vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"])
     n_int_allele_count = length(vec_allele_names)
@@ -420,13 +425,16 @@ end
 ### FUNCTIONS FOR SIMULATING MISSING DATA:
 
 ### Filter pileup file: remove loci with at least 1 missing data point
-function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
+function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50, str_filename_filtered_pileup=".")
     ######################
     ### TEST
     # str_filename_input = "test.pileup"
     # flt_maximum_missing = 0.50
     ######################
-    file_filter_pileup = open(string(str_filename_input, "-FILTERED_", flt_maximum_missing,".pileup"), "w")
+    if str_filename_filtered_pileup == "."
+        str_filename_filtered_pileup = string(str_filename_input, "-FILTERED_", flt_maximum_missing,".pileup")
+    end
+    file_filter_pileup = open(str_filename_filtered_pileup, "w")
     int_maximum_missing_threshold = -1
     open(str_filename_input) do FILE
         while !eof(FILE)
@@ -442,6 +450,85 @@ function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50)
         end
     end
     close(file_filter_pileup)
+end
+
+### simulate missing loci, output a pileup file with missing data, and return the total number of loci
+function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100, n_flt_maximum_fraction_of_loci_with_missing=0.50, n_flt_maximum_fraction_of_pools_with_missing=0.25, str_filename_pileup_simulated_missing=".")
+    ###########################################################
+    ### TEST
+    # str_filename_pileup = "/data-weedomics-1/test_human.pileup"
+    # n_sequencing_read_length = 150
+    # n_flt_maximum_fraction_of_loci_with_missing = 0.50
+    # n_flt_maximum_fraction_of_pools_with_missing = 0.25
+    ###########################################################
+    if str_filename_pileup_simulated_missing=="."
+        str_filename_pileup_simulated_missing = string(join(split(str_filename_pileup, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
+    end
+    println("Counting lines.")
+    @show n_int_loci_count = countlines(str_filename_pileup)
+    println("Counting pools.")
+    file_temp = open(str_filename_pileup, "r")
+    i = -1
+    if i <0
+        i += 1
+        line = readline(file_temp)
+    end
+    close(file_temp)
+    @show n_int_pool_count = Int((length(split(line, '\t')) - 3) / 3)
+    println("Randomly sampling loci chunks to set to missing.")
+    n_int_chunk_count = Int(ceil(n_int_loci_count / n_sequencing_read_length))
+    println("Counting the number of loci and pool which will be set to missing.")
+    n_int_missing_loci_count = Int(round(n_int_chunk_count*n_flt_maximum_fraction_of_loci_with_missing))
+    n_int_missing_pool_count = Int(round(n_int_pool_count*n_flt_maximum_fraction_of_pools_with_missing))
+    println("Randomly sample chunks of loci which will be set to missing.")
+    vec_int_random_chunk = sort(randperm(n_int_chunk_count)[1:n_int_missing_loci_count])
+    vec_int_random_chunk = ((vec_int_random_chunk .- 1) .* n_sequencing_read_length) .+ 1
+    println("Open input and output files, and initialise the interators")
+    FILE = open(str_filename_pileup, "r")
+    file_out = open(str_filename_pileup_simulated_missing, "w")
+    i = 0
+    j = 1
+    println("Simulate missing data.")
+    pb = ProgressMeter.Progress(n_int_loci_count, i)
+    while !eof(FILE)
+        i += 1; ProgressMeter.next!(pb)
+        line = readline(FILE)
+        ### while-looping to properly deal with the last read line
+        while i == vec_int_random_chunk[j]
+            ### if we reach the last missing chunk, then stop incrementing
+            length(vec_int_random_chunk) == j ? j : j += 1
+            ### parse the tab-delimited line
+            vec_str_line = split(line, '\t')
+            ### extract the scaffold or chromosome name
+            str_scaffold_or_chromosome = vec_str_line[1]
+            ### randomly choose pools to get missing data
+            vec_idx_pool_rand_missing = randperm(n_int_pool_count)[1:n_int_missing_pool_count]
+            vec_idx_pool_rand_missing = (((vec_idx_pool_rand_missing .- 1) .* 3) .+ 1) .+ 3
+            n_int_position_ini = parse(Int, vec_str_line[2])
+            n_int_position_end = n_int_position_ini + (n_sequencing_read_length - 1) ### less initial position twice since we're counting the initial position as part of the read length and we've already written it before the forst iteration of the while-loop
+            while (str_scaffold_or_chromosome == vec_str_line[1]) & (parse(Int, vec_str_line[2]) <= n_int_position_end) & !eof(FILE)
+                ### Set to missing each of the randomly sampled pools in the current locus
+                for k in vec_idx_pool_rand_missing
+                    vec_str_line[k:k+2] = ["0", "*", "*"]
+                end
+                ### Write-out the line with simulated missing data
+                line = join(vec_str_line, '\t')
+                write(file_out, string(line, '\n'))
+                i += 1; ProgressMeter.next!(pb)
+                line = readline(FILE)
+                vec_str_line = split(line, '\t')
+            end
+        end
+        ### Write-out the line without missing data
+        write(file_out, string(line, '\n'))
+    end
+    close(FILE)
+    close(file_out)
+    println("##############################################################")
+    println("Missing data simulation finished! Please find the output file:")
+    println(str_filename_pileup_simulated_missing)
+    println("##############################################################")
+    return(i)
 end
 
 ### Find coordinates of missing data in the pileup file
@@ -466,6 +553,90 @@ function fun_find_coordinates_of_missing_data(str_filename_withMissing)
         end
     end
     return(vec_int_idx_missing_loci, vec_int_idx_missing_pools, vec_str_missing_loci)
+end
+
+### filter output syncx file so it contains only the loci with at least 1 imputed datapoint
+function fun_filter_output_syncx(str_filename_output; vec_str_missing_loci, str_filename_syncx_missing_loci_only=".")
+    if str_filename_syncx_missing_loci_only == "."
+        str_filename_syncx_missing_loci_only = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-FILTERED_IMPUTED_LOCI_ONLY.syncx")
+    end
+    file_imputed = open(str_filename_output, "r")
+    file_filtered = open(str_filename_syncx_missing_loci_only, "w")
+    i = 1
+    vec_str_imputed_loci = []
+    println("Counting the number of imputed loci.")
+    n_int_lines_count = countlines(str_filename_output)
+    pb = ProgressMeter.Progress(n_int_lines_count, i)
+    println("Filtering imputation output (syncx file) to include only the imputed loci.")
+    while !eof(file_imputed)
+        ### imputed file loci ID
+        line = readline(file_imputed)
+        ProgressMeter.next!(pb)
+        vec_str_imputed_line = split(line, ',')
+        str_scaffold_imputed = vec_str_imputed_line[1]
+        int_position_imputed = parse(Int, vec_str_imputed_line[2])
+        ### missing loci ID
+        vec_str_missing_locus_pool_id = split(vec_str_missing_loci[i], ':')
+        str_scaffold_missing = vec_str_missing_locus_pool_id[1]
+        int_position_missing = parse(Int, vec_str_missing_locus_pool_id[2])
+        ### Assumptions:
+        ###     (1) Imputed file and missing loci ID are sorted the same way
+        ###     (2) Grouped by scaffold or chromosome
+        ###     (3) Position numbers are in increasing order
+        ### skip the originally missing loci if it was not imputed (Note: assumes sorted by postion per scaffold or chromosome)
+        while (str_scaffold_missing == str_scaffold_imputed) & (int_position_missing < int_position_imputed) & (i < length(vec_str_missing_loci))
+            i += 1
+            vec_str_missing_locus_pool_id = split(vec_str_missing_loci[i], ':')
+            str_scaffold_missing = vec_str_missing_locus_pool_id[1]
+            int_position_missing = parse(Int, vec_str_missing_locus_pool_id[2])
+        end
+        ### Write-out imputed missing loci
+        if (str_scaffold_missing == str_scaffold_imputed) & (int_position_missing == int_position_imputed)
+            push!(vec_str_imputed_loci, join([str_scaffold_imputed, int_position_imputed], ":"))
+            write(file_filtered, string(line, '\n'))
+            ### write-out the remaining 6 alleles (A,T,C,G,INS,DEL,N)
+            for j in 1:6
+                line = readline(file_imputed)
+                write(file_filtered, string(line, '\n'))
+            end
+            i<length(vec_str_missing_loci) ? i += 1 : i = i
+        end
+    end
+    close(file_imputed)
+    close(file_filtered)
+    return(str_filename_syncx_missing_loci_only, vec_str_imputed_loci)
+end
+
+### filter original pileup file to contain only the loci simutated to have missing data and were subsequently imputed
+function fun_filter_original_pileup(str_filename_pilelup_no_missing_loci; vec_str_imputed_loci, str_filename_pileup_filtered_imputed_loci=".")
+    if str_filename_pileup_filtered_imputed_loci == "."
+        str_filename_pileup_filtered_imputed_loci = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)]), "-FILTERED_IMPUTED_LOCI_ONLY.pileup")
+    end
+    file_orig = open(str_filename_pilelup_no_missing_loci, "r")
+    file_imputed = open(str_filename_pileup_filtered_imputed_loci, "w")
+    i = 1
+    println("Counting the number of loci.")
+    n_int_loci_count = countlines(str_filename_pilelup_no_missing_loci)
+    println("Filtering the pileup file to include only the loci which were simulated to be missing and successfully imputed.")
+    pb = ProgressMeter.Progress(n_int_loci_count, i)
+    while !eof(file_orig)
+        line = readline(file_orig)
+        ProgressMeter.next!(pb)
+        vec_str_line = split(line, '\t')
+        str_scaffold_orig = vec_str_line[1]
+        str_position_orig = parse(Int, vec_str_line[2])
+        str_scaffold_imputed = split(vec_str_imputed_loci[i], ':')[1]
+        str_position_imputed = parse(Int, split(vec_str_imputed_loci[i], ':')[2])
+        if str_scaffold_imputed == str_scaffold_orig
+            if str_position_imputed == str_position_orig
+                i<length(vec_str_imputed_loci) ? i += 1 : i = i
+                write(file_imputed, string(line, '\n'))
+            end
+        end
+    end
+    close(file_orig)
+    close(file_imputed)
+    return(str_filename_pileup_filtered_imputed_loci)
 end
 
 end
