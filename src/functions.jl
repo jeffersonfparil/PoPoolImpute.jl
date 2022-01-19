@@ -478,57 +478,63 @@ function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100,
     println("Randomly sampling loci chunks to set to missing.")
     n_int_chunk_count = Int(ceil(n_int_loci_count / n_sequencing_read_length))
     println("Counting the number of loci and pool which will be set to missing.")
-    n_int_missing_loci_count = Int(round(n_int_chunk_count*n_flt_maximum_fraction_of_loci_with_missing))
-    n_int_missing_pool_count = Int(round(n_int_pool_count*n_flt_maximum_fraction_of_pools_with_missing))
-    println("Randomly sample chunks of loci which will be set to missing.")
-    vec_int_random_chunk = sort(randperm(n_int_chunk_count)[1:n_int_missing_loci_count])
-    vec_int_random_chunk = ((vec_int_random_chunk .- 1) .* n_sequencing_read_length) .+ 1
-    println("Open input and output files, and initialise the interators")
-    FILE = open(str_filename_pileup, "r")
-    file_out = open(str_filename_pileup_simulated_missing, "w")
-    i = 0
-    j = 1
-    println("Simulate missing data.")
-    pb = ProgressMeter.Progress(n_int_loci_count, i)
-    while !eof(FILE)
-        i += 1; ProgressMeter.next!(pb)
-        line = readline(FILE)
-        ### while-looping to properly deal with the last read line
-        while i == vec_int_random_chunk[j]
-            ### if we reach the last missing chunk, then stop incrementing
-            length(vec_int_random_chunk) == j ? j : j += 1
-            ### parse the tab-delimited line
-            vec_str_line = split(line, '\t')
-            ### extract the scaffold or chromosome name
-            str_scaffold_or_chromosome = vec_str_line[1]
-            ### randomly choose pools to get missing data
-            vec_idx_pool_rand_missing = randperm(n_int_pool_count)[1:n_int_missing_pool_count]
-            vec_idx_pool_rand_missing = (((vec_idx_pool_rand_missing .- 1) .* 3) .+ 1) .+ 3
-            n_int_position_ini = parse(Int, vec_str_line[2])
-            n_int_position_end = n_int_position_ini + (n_sequencing_read_length - 1) ### less initial position twice since we're counting the initial position as part of the read length and we've already written it before the forst iteration of the while-loop
-            while (str_scaffold_or_chromosome == vec_str_line[1]) & (parse(Int, vec_str_line[2]) <= n_int_position_end) & !eof(FILE)
-                ### Set to missing each of the randomly sampled pools in the current locus
-                for k in vec_idx_pool_rand_missing
-                    vec_str_line[k:k+2] = ["0", "*", "*"]
-                end
-                ### Write-out the line with simulated missing data
-                line = join(vec_str_line, '\t')
-                write(file_out, string(line, '\n'))
-                i += 1; ProgressMeter.next!(pb)
-                line = readline(FILE)
+    @show n_int_missing_loci_count = Int(round(n_int_chunk_count*n_flt_maximum_fraction_of_loci_with_missing))
+    @show n_int_missing_pool_count = Int(round(n_int_pool_count*n_flt_maximum_fraction_of_pools_with_missing))
+    ### Proceed if we will be simulating at least 1 missing datapoint
+    if n_int_missing_loci_count*n_int_missing_pool_count > 0
+        println("Randomly sample chunks of loci which will be set to missing.")
+        vec_int_random_chunk = sort(randperm(n_int_chunk_count)[1:n_int_missing_loci_count])
+        vec_int_random_chunk = ((vec_int_random_chunk .- 1) .* n_sequencing_read_length) .+ 1
+        println("Open input and output files, and initialise the interators")
+        FILE = open(str_filename_pileup, "r")
+        file_out = open(str_filename_pileup_simulated_missing, "w")
+        i = 0
+        j = 1
+        println("Simulate missing data.")
+        pb = ProgressMeter.Progress(n_int_loci_count, i)
+        while !eof(FILE)
+            i += 1; ProgressMeter.next!(pb)
+            line = readline(FILE)
+            ### while-looping to properly deal with the last read line
+            while i == vec_int_random_chunk[j]
+                ### if we reach the last missing chunk, then stop incrementing
+                length(vec_int_random_chunk) == j ? j : j += 1
+                ### parse the tab-delimited line
                 vec_str_line = split(line, '\t')
+                ### extract the scaffold or chromosome name
+                str_scaffold_or_chromosome = vec_str_line[1]
+                ### randomly choose pools to get missing data
+                vec_idx_pool_rand_missing = randperm(n_int_pool_count)[1:n_int_missing_pool_count]
+                vec_idx_pool_rand_missing = (((vec_idx_pool_rand_missing .- 1) .* 3) .+ 1) .+ 3
+                n_int_position_ini = parse(Int, vec_str_line[2])
+                n_int_position_end = n_int_position_ini + (n_sequencing_read_length - 1) ### less initial position twice since we're counting the initial position as part of the read length and we've already written it before the forst iteration of the while-loop
+                while (str_scaffold_or_chromosome == vec_str_line[1]) & (parse(Int, vec_str_line[2]) <= n_int_position_end) & !eof(FILE)
+                    ### Set to missing each of the randomly sampled pools in the current locus
+                    for k in vec_idx_pool_rand_missing
+                        vec_str_line[k:k+2] = ["0", "*", "*"]
+                    end
+                    ### Write-out the line with simulated missing data
+                    line = join(vec_str_line, '\t')
+                    write(file_out, string(line, '\n'))
+                    i += 1; ProgressMeter.next!(pb)
+                    line = readline(FILE)
+                    vec_str_line = split(line, '\t')
+                end
             end
+            ### Write-out the line without missing data
+            write(file_out, string(line, '\n'))
         end
-        ### Write-out the line without missing data
-        write(file_out, string(line, '\n'))
+        close(FILE)
+        close(file_out)
+        println("##############################################################")
+        println("Missing data simulation finished! Please find the output file:")
+        println(str_filename_pileup_simulated_missing)
+        println("##############################################################")
+        return(i)
+    else
+        println("Did not simulate any missing data. Because the fraction of missing loci and pools parameter was too low.")
+        return(1)
     end
-    close(FILE)
-    close(file_out)
-    println("##############################################################")
-    println("Missing data simulation finished! Please find the output file:")
-    println(str_filename_pileup_simulated_missing)
-    println("##############################################################")
-    return(i)
 end
 
 ### Find coordinates of missing data in the pileup file
