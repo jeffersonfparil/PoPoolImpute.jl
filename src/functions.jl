@@ -50,7 +50,6 @@ function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_alle
             for allele in vec_allele_names
                 dic_allele_counts[allele] = missing
             end
-      
         end
         for k in 1:length(vec_allele_names)
             # k = 1
@@ -92,12 +91,44 @@ function fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_
     return(vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts)
 end
 
+### Compute principal components from pairwise loci distances
+function func_compute_PCA_on_distances(;vec_str_name_of_chromosome_or_scaffold, vec_int_position)
+    Z = zeros(length(vec_int_position), length(vec_int_position))
+    for i in 1:length(vec_int_position)
+        for j in 1:length(vec_int_position)
+            if vec_str_name_of_chromosome_or_scaffold[i] == vec_str_name_of_chromosome_or_scaffold[j]
+                Z[i,j] = abs(vec_int_position[i] - vec_int_position[j])
+            else
+                ### Set distance to missing for loci pairs in dfferent chromosomes or scaffolds
+                ### This won't result in imputation.
+                ### Hence, windows between overlapping chromosomes or scaffolds are not included in the imputation
+                ### Maybe this will improve accuracy????!!!
+                Z[i,j] = missing
+            end
+        end
+    end
+    ### Centre Z column-wise
+    Z = Z .- (sum(Z,dims=1) ./ size(Z,1))
+    U, S, Vt = LinearAlgebra.svd(Z)
+    PC = U * LinearAlgebra.Diagonal(S)
+    return(PC)
+end
+
 ### Impute
-function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5)
+function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, vec_str_name_of_chromosome_or_scaffold="", vec_int_position="")
     ############################################# We're not dealing with depths here because I feel like it is more convenient to filter by depth after imputation
     ### TEST
-    # str_filename_input = "out_simissing.mpileup"
-    # n_int_start_locus = 90
+    # using PoPoolImpute
+    # cd("test")
+    # run(`tar -xvf test.pileup.tar.xz`)
+    # using Random; Random.seed!(8)
+    # PoPoolImpute.functions.fun_simulate_missing("test.pileup",
+    #                         n_sequencing_read_length=10,
+    #                         n_flt_maximum_fraction_of_loci_with_missing=0.5,
+    #                         n_flt_maximum_fraction_of_pools_with_missing=0.5,
+    #                         str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
+    # str_filename_input = "test-SIMULATED_MISSING.pileup"
+    # n_int_start_locus = 50
     # n_int_window_size = 20
     # vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
     # vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
@@ -136,6 +167,15 @@ function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_
         ### predictors of allele counts in the pools with missing loci (n_P pools without missing missing loci x n_M pools with missing loci)
         ### Model the distribution of allele frequencies among the pools with missing data
         ###     as functions of the allele frequencies of the pools without missing data
+        OLS_dist = false
+        if OLS_dist
+            ### Adding distance convariates
+            ### Test if missing will be a problem.
+            ### SInce we are setting distance to missing if the positions are not on the same chromosome of scaffold
+            PC = func_compute_PCA_on_distances(vec_str_name_of_chromosome_or_scaffold = repeat(vec_str_name_of_chromosome_or_scaffold, inner=7)[vec_bool_idx_loci_nomissing],
+                                               vec_int_position = repeat(vec_int_position, inner=7)[vec_bool_idx_loci_nomissing])
+            X = hcat(PC[:,1:2], X)
+        end
         B = try
             ### Automatic julia solver
             X\Y
@@ -153,6 +193,11 @@ function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_
         else
             ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
             X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
+            if OLS_dist
+                PC = func_compute_PCA_on_distances(vec_str_name_of_chromosome_or_scaffold = repeat(vec_str_name_of_chromosome_or_scaffold, inner=7)[vec_bool_idx_loci_missing],
+                                                   vec_int_position = repeat(vec_int_position, inner=7)[vec_bool_idx_loci_missing])
+                X_locus_with_missing = hcat(PC[:,1:2], X_locus_with_missing)
+            end
             ### prediced allele counts at the loci with missing data (m_M missing loci x n_M pools with missing loci)
             Y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
         end
@@ -166,6 +211,44 @@ function fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_
     ###     - Mixed model
     ###     - Bayesian inference
     ###     - empirical data of Drosophila, Lolium (Arabidopsis?), and human cancer cells pool-seq data
+
+
+    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ### TRY LMM: add distance covariate
+    
+   
+    B = XZ \ Y
+
+    ### Predict
+    X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
+    
+    vec_str_name_of_chromosome_or_scaffold_to_predict = 
+    vec_int_position_to_predict = 
+    Z = zeros(length(vec_int_position_to_predict), length(vec_int_position_to_predict))
+    for i in 1:length(vec_int_position_to_predict)
+        for j in 1:length(vec_int_position_to_predict)
+            if vec_str_name_of_chromosome_or_scaffold_to_predict[i] == vec_str_name_of_chromosome_or_scaffold_to_predict[j]
+                Z[i,j] = abs(vec_int_position_to_predict[i] - vec_int_position_to_predict[j])
+            else
+                Z[i,j] = missing
+            end
+        end
+    end
+    Z = Z .- (sum(Z,dims=1) ./ size(Z,1))
+    U, S, Vt = LinearAlgebra.svd(Z)
+    PC = U * LinearAlgebra.Diagonal(S)
+    X_ZPC12_to_predict = hcat(X, PC[:,1:2])
+
+    Y_pred = X_ZPC12_to_predict * B
+
+
+    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
 end
 
 ### Simple progress bar
@@ -318,7 +401,11 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
         ### If we have missing loci then impute, else just add the allele counts without missing information
         if n_bool_window_with_at_least_one_missing_locus
             ### Impute by regressing allele counts of the pools with missing data against the allele counts of the pools without missing data in the window; and then predict the missing allele counts
-            mat_imputed, vec_bool_idx_pools_with_missing_loci, vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts, n_flt_maximum_fraction_of_pools_with_missing, n_flt_maximum_fraction_of_loci_with_missing)
+            mat_imputed, vec_bool_idx_pools_with_missing_loci, vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts,
+                                                                                                                 n_flt_maximum_fraction_of_pools_with_missing,
+                                                                                                                 n_flt_maximum_fraction_of_loci_with_missing,
+                                                                                                                 vec_str_name_of_chromosome_or_scaffold,
+                                                                                                                 vec_int_position)
             ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "n_flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "n_flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
             if !ismissing(mat_imputed)
                 mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_with_missing_loci] = mat_imputed
@@ -432,7 +519,7 @@ function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50, str_fil
     # flt_maximum_missing = 0.50
     ######################
     if str_filename_filtered_pileup == "."
-        str_filename_filtered_pileup = string(str_filename_input, "-FILTERED_", flt_maximum_missing,".pileup")
+        str_filename_filtered_pileup = string(join(split(str_filename_input, '.')[1:(end-1)], '.'), "-FILTERED_", flt_maximum_missing,".pileup")
     end
     file_filter_pileup = open(str_filename_filtered_pileup, "w")
     int_maximum_missing_threshold = -1

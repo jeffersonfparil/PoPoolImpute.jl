@@ -5,16 +5,18 @@ using UnicodePlots
 using Distributed
 n_int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
 Distributed.addprocs(n_int_thread_count)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
 ### TEST LOCALLY: comment-out lines 7 and 8 first
-# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-# cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
+@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
+using Random
+Random.seed!(123)
 ################################
 
 ### Main test function:
@@ -25,6 +27,7 @@ cd("test/")
 function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, n_int_number_of_iterations=1)
     # ############################
     # ### TEST
+    # input="test.pileup.tar.xz"
     # window_size=20
     # P_missing_pools=0.5
     # P_missing_loci=0.5
@@ -85,26 +88,46 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         println("Filter the original pileup file to include only the loci which were simulated to have missing data and were subsequently imputed.")
         @time str_filename_pileup_filtered_imputed_loci = PoPoolImpute.functions.fun_filter_original_pileup(str_filename_pilelup_no_missing_loci, vec_str_imputed_loci=vec_str_imputed_loci)
         println("Load true frequencies.")
-        @time scaf_WITHOUT_MISSING,
-            pos_WITHOUT_MISSING,
-            mat_WITHOUT_MISSING = PoPoolImpute.fun_ascii_allele_states_to_counts_per_window(readlines(str_filename_pileup_filtered_imputed_loci))
+        @time vec_str_scaf_WITHOUT_MISSING,
+            vec_int_pos_WITHOUT_MISSING,
+            mat_int_ALLELE_COUNTS_NO_MISSING = PoPoolImpute.fun_ascii_allele_states_to_counts_per_window(readlines(str_filename_pileup_filtered_imputed_loci))
         println("Load imputed frequencies.")
         X = hcat(split.(readlines(str_filename_syncx_missing_loci_only), ",")...)
         vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = X[1,:]
         vec_int_POSITION = parse.(Int, X[2,:])
-        mat_int_ALLELE_COUNTS = parse.(Int, X[3:end,:])'
+        # mat_int_ALLELE_COUNTS = parse.(Int, X[3:end,:])'
+        mat_int_ALLELE_COUNTS = parse.(Float64, X[3:end,:])'
+
+        println("Calculate allele frequencies")
+        mat_flt_ALLELE_FREQS = copy(mat_int_ALLELE_COUNTS)
+        for i in collect(1:7:size(mat_flt_ALLELE_FREQS,1))
+            mat_flt_ALLELE_FREQS[i:(i+6),:] = mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1)
+        end
+        mat_flt_ALLELE_FREQS_NO_MISSING = copy(mat_int_ALLELE_COUNTS_NO_MISSING)
+        for i in collect(1:7:size(mat_flt_ALLELE_FREQS_NO_MISSING,1))
+            mat_flt_ALLELE_FREQS_NO_MISSING[i:(i+6),:] = mat_int_ALLELE_COUNTS_NO_MISSING[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS_NO_MISSING[i:(i+6),:], dims=1)
+        end
+
+
         println("Fraction of missing data that were successfully imputed.")
-        @show n_flt_fraction_missing_imputed = length(scaf_WITHOUT_MISSING) / length(vec_str_missing_loci)
+        @show n_flt_fraction_missing_imputed = length(vec_str_scaf_WITHOUT_MISSING) / length(vec_str_missing_loci)
         println("Remove zero rows (zero frequency alleles.")
-        vec_bool_idx_no_freq_alleles = (sum(mat_WITHOUT_MISSING, dims=2) .== 0)[:,1]
-        mat_WITHOUT_MISSING = mat_WITHOUT_MISSING[.!vec_bool_idx_no_freq_alleles, :]
+        vec_bool_idx_no_freq_alleles = (sum(mat_int_ALLELE_COUNTS_NO_MISSING, dims=2) .== 0)[:,1]
+        mat_int_ALLELE_COUNTS_NO_MISSING = mat_int_ALLELE_COUNTS_NO_MISSING[.!vec_bool_idx_no_freq_alleles, :]
+        mat_flt_ALLELE_FREQS_NO_MISSING = mat_flt_ALLELE_FREQS_NO_MISSING[.!vec_bool_idx_no_freq_alleles, :]
         vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[.!vec_bool_idx_no_freq_alleles]
         vec_int_POSITION = vec_int_POSITION[.!vec_bool_idx_no_freq_alleles]
         mat_int_ALLELE_COUNTS = mat_int_ALLELE_COUNTS[.!vec_bool_idx_no_freq_alleles, :]
+        mat_flt_ALLELE_FREQS = mat_flt_ALLELE_FREQS[.!vec_bool_idx_no_freq_alleles, :]
+
+
+
         println("Keep only the pools (or columns) which refer to the imputed points.")
         i = 1
-        vec_int_freq_true    = []
-        vec_int_freq_imputed = []
+        vec_int_counts_true    = []
+        vec_int_counts_imputed = []
+        vec_flt_freqs_true    = []
+        vec_flt_freqs_imputed = []
         @showprogress for locus in vec_str_missing_loci
             # locus = vec_str_missing_loci[1]
             vec_str_locus = split(locus, ":")
@@ -114,20 +137,32 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                 for allele in 1:7
                     i<length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD) ? i += 1 : i = i
                     vec_int_idx_pools = parse.(Int, vec_str_locus[4:end])
-                    append!(vec_int_freq_true,    mat_WITHOUT_MISSING[i, vec_int_idx_pools])
-                    append!(vec_int_freq_imputed, mat_int_ALLELE_COUNTS[i, vec_int_idx_pools])
+                    append!(vec_int_counts_true,    mat_int_ALLELE_COUNTS_NO_MISSING[i, vec_int_idx_pools])
+                    append!(vec_int_counts_imputed, mat_int_ALLELE_COUNTS[i, vec_int_idx_pools])
+                    append!(vec_flt_freqs_true,    mat_flt_ALLELE_FREQS_NO_MISSING[i, vec_int_idx_pools])
+                    append!(vec_flt_freqs_imputed, mat_flt_ALLELE_FREQS[i, vec_int_idx_pools])
                 end
             end
         end
         if n_int_number_of_iterations == 1
             println("Scatter plot.")
-            @show UnicodePlots.scatterplot(Number.(vec_int_freq_true), Number.(vec_int_freq_imputed), grid=true, color=:white, canvas=BlockCanvas)
+            plot1 = UnicodePlots.scatterplot(Float64.(vec_int_counts_true),
+                                           Float64.(vec_int_counts_imputed),
+                                           title="Counts",
+                                           grid=true, color=:white, canvas=BlockCanvas)
+            plot2 = UnicodePlots.scatterplot(Float64.(vec_flt_freqs_true),
+                                           Float64.(vec_flt_freqs_imputed),
+                                           title="Frquencies",
+                                           grid=true, color=:white, canvas=BlockCanvas)
+            @show plot1
+            @show plot2
         end
         println("Calculate imputation accuracy.")
-        @show n_flt_RMSE = sqrt(sum((vec_int_freq_true .- vec_int_freq_imputed).^2)/prod(size(vec_int_freq_true)))
+        @show n_flt_RMSE_counts = sqrt(sum((vec_int_counts_true .- vec_int_counts_imputed).^2)/prod(size(vec_int_counts_true)))
+        @show n_flt_Rflt_freqs = sqrt(sum((vec_flt_freqs_true .- vec_flt_freqs_imputed).^2)/prod(size(vec_flt_freqs_true)))
         ### Append fraction of imputed missing data, and RMSE into the the output vectors
         append!(vec_flt_fraction_missing_imputed, n_flt_fraction_missing_imputed)
-        append!(vec_flt_RMSE, n_flt_RMSE)
+        append!(vec_flt_RMSE, n_flt_RMSE_counts)
         ### Clean-up
         rm(str_filename_withMissing)
         rm(str_filename_output)
@@ -150,14 +185,6 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
 end
 
 ### MISC: USING OTHER DATASETS
-### Filter pileups to include no missing data
-# vec_str_pileup = ["Drosophila/Drosophila.mpileup",
-#                   "Human/Human.mpileup"]
-# for str_pileup in vec_str_pileup
-#     PoPoolImpute.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
-#     PoPoolImpute.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
-# end
-# #
 # ### Accuracy assessment 
 # using Test
 # using Pkg

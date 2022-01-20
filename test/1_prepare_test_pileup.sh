@@ -69,13 +69,14 @@ time parallel fastq-dump \
 ### Fix the automatic read mismatches between reads generated with pulling out the reads with sra-tools
 echo '#!/bin/bash
 f=$1
+prefix=$2
 gunzip -c $f | \
-sed -E "s/^((@|\+)DRR[^.]+\.[^.]+)\.(1|2)/\1/" | \
+sed -E "s/^((@|\+)${prefix}[^.]+\.[^.]+)\.(1|2)/\1/" | \
 gzip -c > ${f%.fastq.gz*}-fixed.fastq.gz
 ' > fix_paired_end_read_names.sh
 chmod +x fix_paired_end_read_names.sh
 time \
-parallel ./fix_paired_end_read_names.sh {} ::: $(ls Human/*.fastq.gz)
+parallel ./fix_paired_end_read_names.sh {} DRR ::: $(ls Human/*.fastq.gz)
 
 ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -94,35 +95,67 @@ time parallel fastq-dump \
                 --clip \
                 --outdir ctDNA/ \
                 {} ::: SRR9603023 \
-                       SRR9603024 \
-                       SRR9603025 \
                        SRR9603026 \
-                       SRR9603027 \
                        SRR9603028 \
                        SRR9603029 \
                        SRR9603030 \
-                       SRR9603031 \
-                       SRR9603032 \
-                       SRR9603033 \
-                       SRR9603034
+                       SRR9603031
 
-### ADDITIONALLY TEST A SMALL SUBSET OF CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup
-FILE_INPUT="CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup"
-NLOCI=$(wc -l ${FILE_INPUT} | cut -d' ' -f1)
-NLOCI_TO_KEEP=25000
-MAX_RANDOM_VALUE=32767 ### according to https://tldp.org/LDP/abs/html/randomvar.html
-touch FILE_RAND.temp
-for i in $(seq 1 $NLOCI_KEEP)
-do
-        echo "( $RANDOM - 0 ) * $NLOCI / $MAX_RANDOM_VALUE" | bc >> FILE_RAND.temp
-done
+### Probably add MORE!!!! 20220120
 
-touch TEST_25000_loci.pileup
-for line in $(sort -n FILE_RAND.temp | uniq)
-do
-        # echo $line
-        sed "${line}q;d" ${FILE_INPUT} >> TEST_25000_loci.pileup
-done
+### Fix the automatic read mismatches between reads generated with pulling out the reads with sra-tools
+time \
+parallel ./fix_paired_end_read_names.sh {} SRR ::: $(ls ctDNA/*.fastq.gz)
+### Align
+time \
+parallel --link \
+        ./align.sh \
+                Human/Human_reference \
+                40 \
+                {1} \
+                {2} \
+                ::: $(ls ctDNA/*_pass_1-fixed.fastq.gz) \
+                ::: $(ls ctDNA/*_pass_2-fixed.fastq.gz)
+### Pileup
+d=ctDNA
+ls ${d}/*.bam > ${d}/${d}_bam_list.txt
+time \
+samtools mpileup \
+        -b ${d}/${d}_bam_list.txt \
+        -d 100000 \
+        -q 40 \
+        -Q 40 \
+        -f Human/Human_reference.fasta \
+        -o ${d}/${d}.mpileup
+
+
+# ### IN SSH_UNI
+# ### ADDITIONALLY TEST A SMALL SUBSET OF CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup
+# FILE_INPUT="CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup"
+# NLOCI=$(wc -l ${FILE_INPUT} | cut -d' ' -f1)
+# NLOCI_TO_KEEP=25000
+# MAX_RANDOM_VALUE=32767 ### according to https://tldp.org/LDP/abs/html/randomvar.html
+# touch FILE_RAND.temp
+# while [ $(cat FILE_RAND.temp | wc -l) -lt $NLOCI_TO_KEEP ]
+# do
+#         while [ $(cat FILE_RAND.temp | wc -l) -lt $NLOCI_TO_KEEP ]
+#         do
+#                 echo "( $RANDOM - 0 ) * $NLOCI / $MAX_RANDOM_VALUE" | bc >> FILE_RAND.temp
+#         done
+#         mv FILE_RAND.temp FILE_RAND.temp2
+#         sort -n FILE_RAND.temp2 | uniq > FILE_RAND.temp
+#         rm FILE_RAND.temp2
+# done
+
+# touch TEST_25000_loci.pileup
+# i=0
+# for line in $(sort -n FILE_RAND.temp | uniq)
+# do
+#         # echo $line
+#         i=$(echo "$i + 1" | bc)
+#         fun_progress_bar $i $NLOCI_TO_KEEP 40
+#         sed "${line}q;d" ${FILE_INPUT} >> TEST_25000_loci.pileup
+# done
 
 
 ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -231,3 +264,16 @@ parallel \
         -o {1}/{1}.mpileup \
         ::: Drosophila Human
 
+
+echo "#################################################"
+echo "###                                           ###"
+echo "### Filter pileups to include no missing data ###"
+echo "###                                           ###"
+echo "#################################################"
+
+vec_str_pileup = ["Drosophila/Drosophila.mpileup",
+                  "Human/Human.mpileup"]
+for str_pileup in vec_str_pileup
+#     PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
+    PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
+end

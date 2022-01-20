@@ -49,22 +49,22 @@ PoPoolImpute.impute(str_filename_input, str_filename_output="multithreaded.syncx
 
 Performs a simple least squares linear regression to predict missing allele counts per window:
 
-**Yₚ = XₚB**
+**Xₚₘ = XₚₚB**
 
-**→ B̂ = inverse(XₚᵀXₚ) (XₚᵀYₚ)**.
+**→ B̂ = inverse(XₚₚᵀXₚₚ) (XₚₚᵀXₚₘ)**.
 
 Imputation is achieved by predicting the missing allele counts:
 
-**Ŷₘ = XₘB̂**.
+**X̂ₘₘ = XₘₚB̂**.
 
 Where:
 
-- **Yₚ** is the matrix of allele counts of pools with missing data at the loci without missing data (dimensions: **mₚ** non-missing loci × 7 alleles, **nₘ** pools with missing loci);
-- **Xₚ** is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: **mₚ** non-missing loci × 7 alleles, **nₚ** pools without missing loci);
+- **Xₚₘ** is the matrix of allele counts of pools with missing data at the loci without missing data (dimensions: **mₚ** non-missing loci × 7 alleles, **nₘ** pools with missing loci);
+- **Xₚₚ** is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: **mₚ** non-missing loci × 7 alleles, **nₚ** pools without missing loci);
 - **B̂** is the matrix of estimates of the effects of each pool without missing data on the allele counts of the pools with missing data (dimensions: **nₚ** pools without missing loci, **nₘ** pools with missing loci);
 - **inverse()** is the Moore-Penrose pseudoinverse if the automatic Julia solver fails;
-- **Ŷₘ** is the matrix of imputed allele counts of pools with missing data (dimensions: **mₘ** missing loci × 7 alleles, **nₘ** pools with missing loci); and
-- **Xₘ** is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: **mₘ** non-missing loci × 7 alleles, **nₚ** pools without missing loci).
+- **X̂ₘₘ** is the matrix of imputed allele counts of pools with missing data (dimensions: **mₘ** missing loci × 7 alleles, **nₘ** pools with missing loci); and
+- **Xₘₚ** is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: **mₘ** non-missing loci × 7 alleles, **nₚ** pools without missing loci).
 
 The imputed allele counts are averaged across the windows sliding one locus at a time.
 
