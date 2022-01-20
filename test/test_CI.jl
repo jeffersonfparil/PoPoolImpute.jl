@@ -2,21 +2,21 @@ using Test
 using Pkg
 using ProgressMeter
 using UnicodePlots
+using Random; Random.seed!(123)
 using Distributed
 n_int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
 Distributed.addprocs(n_int_thread_count)
-# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# @everywhere using PoPoolImpute
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+@everywhere using PoPoolImpute
+
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
 ### TEST LOCALLY: comment-out lines 7 and 8 first
-@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
-using Random
-Random.seed!(123)
+# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+# cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
 ################################
 
 ### Main test function:
