@@ -271,9 +271,11 @@ echo "### Filter pileups to include no missing data ###"
 echo "###                                           ###"
 echo "#################################################"
 
-vec_str_pileup = ["Drosophila/Drosophila.mpileup",
-                  "Human/Human.mpileup"]
-for str_pileup in vec_str_pileup
-#     PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
-    PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
-end
+# In julia:
+# using PoPoolImpute
+# vec_str_pileup = ["Drosophila/Drosophila.mpileup",
+#                   "Human/Human.mpileup"]
+# for str_pileup in vec_str_pileup
+# #     PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
+#     PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
+# end

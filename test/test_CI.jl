@@ -184,7 +184,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     return(0)
 end
 
-### MISC: USING OTHER DATASETS
+# ### MISC: USING OTHER DATASETS
 # ### Accuracy assessment 
 # using Test
 # using Pkg
@@ -196,7 +196,7 @@ end
 # Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 # @everywhere using PoPoolImpute
 # ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
-# @time fun_sim_impute_check("/data-weedomics-1/test_human.pileup",
+# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
 #                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
