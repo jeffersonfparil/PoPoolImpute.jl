@@ -99,9 +99,13 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         mat_int_ALLELE_COUNTS = parse.(Float64, X[3:end,:])'
 
         println("Calculate allele frequencies")
+        n_int_pool_count = size(mat_int_ALLELE_COUNTS, 2)
         mat_flt_ALLELE_FREQS = copy(mat_int_ALLELE_COUNTS)
         for i in collect(1:7:size(mat_flt_ALLELE_FREQS,1))
             mat_flt_ALLELE_FREQS[i:(i+6),:] = mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1)
+            if sum(isnan.(mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1))) > 0
+                mat_flt_ALLELE_FREQS[i:(i+6),:] = zeros(7, n_int_pool_count) ### 0 / 0 is zero
+            end
         end
         mat_flt_ALLELE_FREQS_NO_MISSING = copy(mat_int_ALLELE_COUNTS_NO_MISSING)
         for i in collect(1:7:size(mat_flt_ALLELE_FREQS_NO_MISSING,1))
@@ -152,11 +156,31 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                                            grid=true, color=:white, canvas=BlockCanvas)
             plot2 = UnicodePlots.scatterplot(Float64.(vec_flt_freqs_true),
                                            Float64.(vec_flt_freqs_imputed),
-                                           title="Frquencies",
+                                           title="Frequencies",
                                            grid=true, color=:white, canvas=BlockCanvas)
             @show plot1
             @show plot2
         end
+        println("Save true and predicted counts and frequencies")
+        str_filename_output_csv = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-ACCURACY.csv")
+        FILE_OUTPUT = open(str_filename_output_csv, "w")
+        str_header = "Iteration,Window_size,P_missing_pools,P_missing_loci,Read_length,P_missing_imputed,True_counts,Imputed_counts,True_freqs,Imputed_freqs\n"
+        write(FILE_OUTPUT, str_header)
+        for i in 1:length(vec_int_counts_true)
+            str_line = string(join([string(t),
+                                    string(window_size),
+                                    string(P_missing_pools),
+                                    string(P_missing_loci),
+                                    string(n_sequencing_read_length),
+                                    string(round(n_flt_fraction_missing_imputed, digits=4)),
+                                    string(vec_int_counts_true[i]),
+                                    string(vec_int_counts_imputed[i]),
+                                    string(round(vec_flt_freqs_true[i], digits=4)),
+                                    string(round(vec_flt_freqs_imputed[i], digits=4))],
+                              ','), '\n')
+            write(FILE_OUTPUT, str_line)
+        end
+        close(FILE_OUTPUT)
         println("Calculate imputation accuracy.")
         @show n_flt_RMSE_counts = sqrt(sum((vec_int_counts_true .- vec_int_counts_imputed).^2)/prod(size(vec_int_counts_true)))
         @show n_flt_Rflt_freqs = sqrt(sum((vec_flt_freqs_true .- vec_flt_freqs_imputed).^2)/prod(size(vec_flt_freqs_true)))
@@ -185,7 +209,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
 end
 
 # ### MISC: USING OTHER DATASETS
-# ### Accuracy assessment 
+# ### Accuracy assessment
 # using Test
 # using Pkg
 # using ProgressMeter
@@ -201,4 +225,4 @@ end
 #                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
-#                            n_int_number_of_iterations=1)
+#                            n_int_number_of_iterations=100)
