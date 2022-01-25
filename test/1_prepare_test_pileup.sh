@@ -127,37 +127,6 @@ samtools mpileup \
         -Q 40 \
         -f Human/Human_reference.fasta \
         -o ${d}/${d}.mpileup
-
-
-# ### IN SSH_UNI
-# ### ADDITIONALLY TEST A SMALL SUBSET OF CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup
-# FILE_INPUT="CLETH_MERGED_ALL.mpileup-FILTERED_0.0.pileup"
-# NLOCI=$(wc -l ${FILE_INPUT} | cut -d' ' -f1)
-# NLOCI_TO_KEEP=25000
-# MAX_RANDOM_VALUE=32767 ### according to https://tldp.org/LDP/abs/html/randomvar.html
-# touch FILE_RAND.temp
-# while [ $(cat FILE_RAND.temp | wc -l) -lt $NLOCI_TO_KEEP ]
-# do
-#         while [ $(cat FILE_RAND.temp | wc -l) -lt $NLOCI_TO_KEEP ]
-#         do
-#                 echo "( $RANDOM - 0 ) * $NLOCI / $MAX_RANDOM_VALUE" | bc >> FILE_RAND.temp
-#         done
-#         mv FILE_RAND.temp FILE_RAND.temp2
-#         sort -n FILE_RAND.temp2 | uniq > FILE_RAND.temp
-#         rm FILE_RAND.temp2
-# done
-
-# touch TEST_25000_loci.pileup
-# i=0
-# for line in $(sort -n FILE_RAND.temp | uniq)
-# do
-#         # echo $line
-#         i=$(echo "$i + 1" | bc)
-#         fun_progress_bar $i $NLOCI_TO_KEEP 40
-#         sed "${line}q;d" ${FILE_INPUT} >> TEST_25000_loci.pileup
-# done
-
-
 ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

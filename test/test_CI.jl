@@ -98,11 +98,13 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         # mat_int_ALLELE_COUNTS = parse.(Int, X[3:end,:])'
         mat_int_ALLELE_COUNTS = parse.(Float64, X[3:end,:])'
 
-        println("Calculate allele frequencies")
+        println("Calculate allele frequencies, and total depth")
         n_int_pool_count = size(mat_int_ALLELE_COUNTS, 2)
         mat_flt_ALLELE_FREQS = copy(mat_int_ALLELE_COUNTS)
+        mat_int_DEPTHS = Int.(copy(mat_int_ALLELE_COUNTS))
         for i in collect(1:7:size(mat_flt_ALLELE_FREQS,1))
             mat_flt_ALLELE_FREQS[i:(i+6),:] = mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1)
+            mat_int_DEPTHS[i:(i+6),:] = repeat(sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1), 7)
             if sum(isnan.(mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1))) > 0
                 mat_flt_ALLELE_FREQS[i:(i+6),:] = zeros(7, n_int_pool_count) ### 0 / 0 is zero
             end
@@ -123,11 +125,13 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         vec_int_POSITION = vec_int_POSITION[.!vec_bool_idx_no_freq_alleles]
         mat_int_ALLELE_COUNTS = mat_int_ALLELE_COUNTS[.!vec_bool_idx_no_freq_alleles, :]
         mat_flt_ALLELE_FREQS = mat_flt_ALLELE_FREQS[.!vec_bool_idx_no_freq_alleles, :]
+        mat_int_DEPTHS = mat_int_DEPTHS[.!vec_bool_idx_no_freq_alleles, :]
 
 
 
         println("Keep only the pools (or columns) which refer to the imputed points.")
         i = 1
+        vec_int_depths    = []
         vec_int_counts_true    = []
         vec_int_counts_imputed = []
         vec_flt_freqs_true    = []
@@ -141,9 +145,10 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                 for allele in 1:7
                     i<length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD) ? i += 1 : i = i
                     vec_int_idx_pools = parse.(Int, vec_str_locus[4:end])
-                    append!(vec_int_counts_true,    mat_int_ALLELE_COUNTS_NO_MISSING[i, vec_int_idx_pools])
+                    append!(vec_int_depths, mat_int_DEPTHS[i, vec_int_idx_pools])
+                    append!(vec_int_counts_true, mat_int_ALLELE_COUNTS_NO_MISSING[i, vec_int_idx_pools])
                     append!(vec_int_counts_imputed, mat_int_ALLELE_COUNTS[i, vec_int_idx_pools])
-                    append!(vec_flt_freqs_true,    mat_flt_ALLELE_FREQS_NO_MISSING[i, vec_int_idx_pools])
+                    append!(vec_flt_freqs_true, mat_flt_ALLELE_FREQS_NO_MISSING[i, vec_int_idx_pools])
                     append!(vec_flt_freqs_imputed, mat_flt_ALLELE_FREQS[i, vec_int_idx_pools])
                 end
             end
@@ -164,7 +169,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         println("Save true and predicted counts and frequencies")
         str_filename_output_csv = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-ACCURACY.csv")
         FILE_OUTPUT = open(str_filename_output_csv, "w")
-        str_header = "Iteration,Window_size,P_missing_pools,P_missing_loci,Read_length,P_missing_imputed,True_counts,Imputed_counts,True_freqs,Imputed_freqs\n"
+        str_header = "Iteration,Window_size,P_missing_pools,P_missing_loci,Read_length,P_missing_imputed,Depth,True_counts,Imputed_counts,True_freqs,Imputed_freqs\n"
         write(FILE_OUTPUT, str_header)
         for i in 1:length(vec_int_counts_true)
             str_line = string(join([string(t),
@@ -173,6 +178,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                                     string(P_missing_loci),
                                     string(n_sequencing_read_length),
                                     string(round(n_flt_fraction_missing_imputed, digits=4)),
+                                    string(vec_int_depths[i]),
                                     string(vec_int_counts_true[i]),
                                     string(vec_int_counts_imputed[i]),
                                     string(round(vec_flt_freqs_true[i], digits=4)),
