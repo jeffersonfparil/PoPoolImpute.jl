@@ -26,7 +26,7 @@ fun_filter_data_and_plot = function(data, vec_bool_filter=rep(TRUE, nrow(dat))){
 }
 
 fun_filter_data_and_plot(data=dat)
-fun_filter_data_and_plot(data=dat, vec_bool_filter=c((dat$Depth >=20) & (dat$Depth <=10000)))
+fun_filter_data_and_plot(data=dat, vec_bool_filter=c((dat$Depth >=100) & (dat$Depth <=1e6)))
 
 
 ### Clean-up
