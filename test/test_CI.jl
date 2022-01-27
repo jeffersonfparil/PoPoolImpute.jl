@@ -6,16 +6,16 @@ using Random
 using Distributed
 n_int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
 Distributed.addprocs(n_int_thread_count)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
 ### TEST LOCALLY: comment-out lines 9 and 10 first
-# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-# cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
+@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
 ################################
 
 ### Main test function:
@@ -84,6 +84,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         println("Filter the output syncx file to include only the loci with imputed missing data.")
         @time str_filename_syncx_missing_loci_only, 
               vec_str_imputed_loci = PoPoolImpute.functions.fun_filter_output_syncx(str_filename_output, vec_str_missing_loci=vec_str_missing_loci)
+        ### Did we impute anything?
         if length(vec_str_imputed_loci)==0
             q += 1
             continue
@@ -244,7 +245,7 @@ end
 #                            n_int_number_of_iterations=1)
 # ### Clean-up
 # cd("/data-weedomics-1/ctDNA-OLS_dist/")
-# rm(readdir()[match.(Regex("ACCURACY"), readdir()) .!= nothing][1])
+# rm.(readdir()[match.(Regex("ACCURACY.csv"), readdir()) .!= nothing])
 # cd("/data-weedomics-1/")
 # ### Main run
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA-OLS_dist/ctDNA.mpileup-FILTERED_0.0.pileup",

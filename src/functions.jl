@@ -93,9 +93,10 @@ end
 
 ### Compute pairwise loci distances
 function func_pairwise_loci_distances(vec_str_name_of_chromosome_or_scaffold, vec_int_position)
-    Z = convert(Array{Any,2}, zeros(length(vec_int_position), length(vec_int_position)))
-    for i in 1:length(vec_int_position)
-        for j in 1:length(vec_int_position)
+    p = length(vec_int_position)
+    Z = convert(Array{Any,2}, zeros(p, p))
+    for i in 1:p
+        for j in 1:p
             if vec_str_name_of_chromosome_or_scaffold[i] == vec_str_name_of_chromosome_or_scaffold[j]
                 Z[i,j] = abs(vec_int_position[i] - vec_int_position[j])
             else
@@ -399,12 +400,14 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
         ### If we have missing loci then impute, else just add the allele counts without missing information
         if n_bool_window_with_at_least_one_missing_locus
             ### Impute by regressing allele counts of the pools with missing data against the allele counts of the pools without missing data in the window; and then predict the missing allele counts
-            mat_imputed, vec_bool_idx_pools_with_missing_loci, vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts,
-                                                                                                                 vec_str_name_of_chromosome_or_scaffold,
-                                                                                                                 vec_int_position,
-                                                                                                                 n_flt_maximum_fraction_of_pools_with_missing,
-                                                                                                                 n_flt_maximum_fraction_of_loci_with_missing,
-                                                                                                                 bool_OLS_dist=bool_OLS_dist)
+            mat_imputed, 
+            vec_bool_idx_pools_with_missing_loci,
+            vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts,
+                                                              vec_str_name_of_chromosome_or_scaffold,
+                                                              vec_int_position,
+                                                              n_flt_maximum_fraction_of_pools_with_missing,
+                                                              n_flt_maximum_fraction_of_loci_with_missing,
+                                                              bool_OLS_dist=bool_OLS_dist)
             ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "n_flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "n_flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
             if !ismissing(mat_imputed)
                 mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_with_missing_loci] = mat_imputed
