@@ -243,7 +243,9 @@ end
 #                            bool_OLS_dist=true,
 #                            n_int_number_of_iterations=1)
 # ### Clean-up
+# cd("/data-weedomics-1/ctDNA-OLS_dist/")
 # rm(readdir()[match.(Regex("ACCURACY"), readdir()) .!= nothing][1])
+# cd("/data-weedomics-1/")
 # ### Main run
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA-OLS_dist/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
