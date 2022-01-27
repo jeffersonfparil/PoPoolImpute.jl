@@ -235,18 +235,20 @@ end
 # @everywhere using PoPoolImpute
 # ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
 # ### Precompile with 1 iteration
-# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+# @time fun_sim_impute_check("/data-weedomics-1/ctDNA-OLS_dist/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
 #                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
+#                            bool_OLS_dist=true,
 #                            n_int_number_of_iterations=1)
 # ### Clean-up
 # rm(readdir()[match.(Regex("ACCURACY"), readdir()) .!= nothing][1])
 # ### Main run
-# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+# @time fun_sim_impute_check("/data-weedomics-1/ctDNA-OLS_dist/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
 #                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
+#                            bool_OLS_dist=true,
 #                            n_int_number_of_iterations=100)
