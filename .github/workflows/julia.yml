@@ -41,4 +41,4 @@ jobs:
       - name:  Test 1 iteration and plot
         run: julia -e 'include("test/test_CI.jl"); fun_sim_impute_check(n_int_number_of_iterations=1)'
       - name:  Test 10 iterations and assess accuracy
-        run: julia -e 'include("test/test_CI.jl"); fun_sim_impute_check(n_int_number_of_iterations=10)'
+        run: julia -e 'include("test/test_CI.jl"); fun_sim_impute_check(bool_OLS_dist=true, n_int_number_of_iterations=10)'
