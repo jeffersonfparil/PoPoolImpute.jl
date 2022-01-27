@@ -29,6 +29,24 @@ fun_filter_data_and_plot(data=dat)
 fun_filter_data_and_plot(data=dat, vec_bool_filter=c((dat$Depth >=100) & (dat$Depth <=1e6)))
 
 
+
+dat$Deviation_counts = abs(dat$True_counts - dat$Imputed_counts)
+dat$Deviation_freqs = abs(dat$True_freqs - dat$Imputed_freqs)
+
+par(mfrow=c(2,2))
+plot(dat$Depth, dat$Deviation_counts, type="p", pch=19, col=rgb(0.8,0.1,0.2,alpha=0.5))
+grid()
+plot(dat$Depth, dat$Deviation_freqs, type="p", pch=19, col=rgb(0.1,0.5,0.1,alpha=0.5))
+grid()
+plot(dat$True_counts, dat$Deviation_counts, type="p", pch=19, col=rgb(0.1,0.1,0.6,alpha=0.5))
+grid()
+plot(dat$True_freqs, dat$Deviation_freqs, type="p", pch=19, col=rgb(0.9,0.7,0.1,alpha=0.5))
+grid()
+
+
+summary(dat$Depth)
+
+
 ### Clean-up
 system(paste0("rm ", fname_ctDNA))
 

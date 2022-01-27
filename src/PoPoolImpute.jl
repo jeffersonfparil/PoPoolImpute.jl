@@ -19,7 +19,7 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 
 
 # Usage
-`PopPoolImpute.impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_int_thread_count=1)`
+`PopPoolImpute.impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_OLS_dist=false, n_int_thread_count=1)`
 
 
 # Inputs
@@ -27,7 +27,8 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 2. n\\_int\\_window\\_size [Integer; default=10]: size of the sliding window across which imputation is performed
 3. n\\_flt\\_maximum\\_fraction\\_of\\_pools\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the pools with at least one missing locus
 4. n\\_flt\\_maximum\\_fraction\\_of\\_loci\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
-5. n\\_int\\_thread\\_count [Integer; default=1]: number of computing threads to use
+5. bool\\_OLS\\_dist [Boolean; default=false]: perform ordinary least squares regression with pairwise loci distances covariate
+6. n\\_int\\_thread\\_count [Integer; default=1]: number of computing threads to use
 
 
 # Output
@@ -84,7 +85,7 @@ The imputed allele counts are averaged across the windows sliding one locus at a
 ...
 
 """
-function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_int_thread_count=2)
+function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_OLS_dist=false, n_int_thread_count=2)
     ###################################################################
     ### TEST
     # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
@@ -154,7 +155,8 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                                 n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
                                 str_filename_output=str_filename_chunk_output,
                                 n_bool_skip_leading_window=n_bool_skip_leading_window,
-                                n_bool_skip_trailing_window=n_bool_skip_trailing_window)
+                                n_bool_skip_trailing_window=n_bool_skip_trailing_window,
+                                bool_OLS_dist=bool_OLS_dist)
         end
     else
         ### Non-parallel imputation for unsplit input file
@@ -165,7 +167,8 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
                                 n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
                                 str_filename_output=str_filename_output,
                                 n_bool_skip_leading_window=false,
-                                n_bool_skip_trailing_window=false)
+                                n_bool_skip_trailing_window=false,
+                                bool_OLS_dist=bool_OLS_dist)
     end
     ### Concatenate chunks
     if n_int_chunk_count > 1

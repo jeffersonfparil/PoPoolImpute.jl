@@ -2,19 +2,18 @@ using Test
 using Pkg
 using ProgressMeter
 using UnicodePlots
-using Random; Random.seed!(123)
+using Random
 using Distributed
 n_int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
 Distributed.addprocs(n_int_thread_count)
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
 
-
 ### Navigate to testing directory
 cd("test/")
 
 ################################
-### TEST LOCALLY: comment-out lines 7 and 8 first
+### TEST LOCALLY: comment-out lines 9 and 10 first
 # @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 # cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
 ################################
@@ -24,7 +23,7 @@ cd("test/")
 ###     (2) impute
 ###     (3) load imputation output, and
 ###     (4) check imputation accuracy
-function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, n_int_number_of_iterations=1)
+function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_OLS_dist=false, n_int_number_of_iterations=1)
     # ############################
     # ### TEST
     # input="test.pileup.tar.xz"
@@ -49,6 +48,8 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     q = 0 ### error counter
     q_max = 10 ### maximum number of error
     while (t < n_int_number_of_iterations) & ( q <= q_max)
+        ### Set pseudo-randomisation seed
+        Random.seed!(t)
         ### Simulate 10% missing loci in 10% of the pools
         str_filename_withMissing = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
         PoPoolImpute.functions.fun_simulate_missing(str_filename_pilelup_no_missing_loci,
@@ -64,6 +65,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                                                     n_flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
                                                     n_flt_maximum_fraction_of_loci_with_missing=P_missing_loci,
                                                     str_filename_output=str_filename_output,
+                                                    bool_OLS_dist=bool_OLS_dist,
                                                     n_int_thread_count=n_int_thread_count)==0
             t += 1
             q = 0 ### reset error counter
@@ -220,12 +222,23 @@ end
 # using Pkg
 # using ProgressMeter
 # using UnicodePlots
+# using Random
 # using Distributed
 # n_int_thread_count = 30
 # Distributed.addprocs(n_int_thread_count)
 # Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 # @everywhere using PoPoolImpute
 # ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
+# ### Precompile with 1 iteration
+# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+#                            window_size=200,
+#                            P_missing_pools=0.5,
+#                            P_missing_loci=0.5,
+#                            n_sequencing_read_length=100,
+#                            n_int_number_of_iterations=1)
+# ### Clean-up
+# rm(readdir()[match.(Regex("ACCURACY"), readdir()) .!= nothing][1])
+# ### Main run
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
 #                            P_missing_pools=0.5,
