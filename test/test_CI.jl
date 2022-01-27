@@ -46,10 +46,10 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     ### Using a while-try-catch expression to prevent failure when one of the chunks are too sparse due to the stochasticity of "2_simulate_missing_loci_in_pileup_file.sh"
     t = 0 ### iteration counter
     q = 0 ### error counter
-    q_max = 10 ### maximum number of error
+    q_max = 100 ### maximum number of error
     while (t < n_int_number_of_iterations) & ( q <= q_max)
         ### Set pseudo-randomisation seed
-        Random.seed!(t)
+        Random.seed!(t+q)
         ### Simulate 10% missing loci in 10% of the pools
         str_filename_withMissing = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
         PoPoolImpute.functions.fun_simulate_missing(str_filename_pilelup_no_missing_loci,
@@ -58,7 +58,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                              n_flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
                              str_filename_pileup_simulated_missing=str_filename_withMissing)
         ### Impute (catch errors when the input file is too sparse, and re-run simulation of missing data)
-        str_filename_output = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".pileup")
+        str_filename_output = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
         try
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
                                                     n_int_window_size=window_size,
@@ -67,8 +67,6 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                                                     str_filename_output=str_filename_output,
                                                     bool_OLS_dist=bool_OLS_dist,
                                                     n_int_thread_count=n_int_thread_count)==0
-            t += 1
-            q = 0 ### reset error counter
         catch
             @show "At least one of the chunks has too many missing data!"
             ### Clean-up defective chunk/s and the pileup with simulated missing data
@@ -86,6 +84,13 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         println("Filter the output syncx file to include only the loci with imputed missing data.")
         @time str_filename_syncx_missing_loci_only, 
               vec_str_imputed_loci = PoPoolImpute.functions.fun_filter_output_syncx(str_filename_output, vec_str_missing_loci=vec_str_missing_loci)
+        if length(vec_str_imputed_loci)==0
+            q += 1
+            continue
+        else
+            t += 1 ### update iteration ID
+            q = 0 ### reset error counter
+        end
         ### Proceed if we imputed anything
         println("Filter the original pileup file to include only the loci which were simulated to have missing data and were subsequently imputed.")
         @time str_filename_pileup_filtered_imputed_loci = PoPoolImpute.functions.fun_filter_original_pileup(str_filename_pilelup_no_missing_loci, vec_str_imputed_loci=vec_str_imputed_loci)
