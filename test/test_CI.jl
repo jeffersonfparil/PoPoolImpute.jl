@@ -236,7 +236,7 @@ end
 # @everywhere using PoPoolImpute
 # ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
 # ### Precompile with 1 iteration
-# @time fun_sim_impute_check("/data-weedomics-1/ctDNA-OLS_dist/ctDNA.mpileup-FILTERED_0.0.pileup",
+# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
 #                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
@@ -244,11 +244,11 @@ end
 #                            bool_OLS_dist=true,
 #                            n_int_number_of_iterations=1)
 # ### Clean-up
-# cd("/data-weedomics-1/ctDNA-OLS_dist/")
+# cd("/data-weedomics-1/ctDNA/")
 # rm.(readdir()[match.(Regex("ACCURACY.csv"), readdir()) .!= nothing])
 # cd("/data-weedomics-1/")
 # ### Main run
-# @time fun_sim_impute_check("/data-weedomics-1/ctDNA-OLS_dist/ctDNA.mpileup-FILTERED_0.0.pileup",
+# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
 #                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
