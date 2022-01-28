@@ -165,15 +165,16 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
         ### predictors of allele counts in the pools with missing loci (n_P pools without missing missing loci x n_M pools with missing loci)
         ### Model the distribution of allele frequencies among the pools with missing data
         ###     as functions of the allele frequencies of the pools without missing data
+        bool_overlapping_chromomosomes = length(unique(vec_str_name_of_chromosome_or_scaffold)) > 1
         if bool_OLS_dist
-            ### Adding distance convariates
-            ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
-            Z = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
-                                 repeat(vec_int_position, inner=7))
-            if sum(ismissing.(Z)) == 0
+            if !bool_overlapping_chromomosomes
+                ### Adding distance convariates
+                ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
+                Z = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
+                                                repeat(vec_int_position, inner=7))
                 X = Int.(hcat(Z[vec_bool_idx_loci_nomissing,:], X))
             else
-                X = hcat(repeat([missing], size(X,1)), X)
+                X = missing ### skip windows with overlapping chromosomes
             end
         end
         B = try
