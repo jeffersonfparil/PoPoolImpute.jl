@@ -122,7 +122,7 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     # PoPoolImpute.functions.fun_simulate_missing("test.pileup",
     #                         n_sequencing_read_length=10,
     #                         n_flt_maximum_fraction_of_loci_with_missing=0.5,
-    #                         n_flt_maximum_fraction_of_pools_with_missing=0.5,
+    #                         n_flt_maximum_fraction_of_pools_with_missing=0.1,
     #                         str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
     # str_filename_input = "test-SIMULATED_MISSING.pileup"
     # n_int_start_locus = 30 # 50
@@ -130,7 +130,7 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     # vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
     # vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
     # @time vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
-    # n_flt_maximum_fraction_of_pools_with_missing = 0.5
+    # n_flt_maximum_fraction_of_pools_with_missing = 0.1
     # n_flt_maximum_fraction_of_loci_with_missing = 0.5
     # bool_OLS_dist = false
     #############################################
@@ -211,44 +211,6 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     ###     - Mixed model
     ###     - Bayesian inference
     ###     - empirical data of Drosophila, Lolium (Arabidopsis?), and human cancer cells pool-seq data
-
-
-    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    ### TRY LMM: add distance covariate
-    
-   
-    B = XZ \ Y
-
-    ### Predict
-    X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
-    
-    vec_str_name_of_chromosome_or_scaffold_to_predict = 
-    vec_int_position_to_predict = 
-    Z = zeros(length(vec_int_position_to_predict), length(vec_int_position_to_predict))
-    for i in 1:length(vec_int_position_to_predict)
-        for j in 1:length(vec_int_position_to_predict)
-            if vec_str_name_of_chromosome_or_scaffold_to_predict[i] == vec_str_name_of_chromosome_or_scaffold_to_predict[j]
-                Z[i,j] = abs(vec_int_position_to_predict[i] - vec_int_position_to_predict[j])
-            else
-                Z[i,j] = missing
-            end
-        end
-    end
-    Z = Z .- (sum(Z,dims=1) ./ size(Z,1))
-    U, S, Vt = LinearAlgebra.svd(Z)
-    PC = U * LinearAlgebra.Diagonal(S)
-    X_ZPC12_to_predict = hcat(X, PC[:,1:2])
-
-    Y_pred = X_ZPC12_to_predict * B
-
-
-    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    ###@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-
 end
 
 ### Simple progress bar

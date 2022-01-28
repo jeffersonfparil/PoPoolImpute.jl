@@ -238,7 +238,7 @@ end
 # ### Precompile with 1 iteration
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
-#                            P_missing_pools=0.5,
+#                            P_missing_pools=0.1,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            bool_OLS_dist=true,
@@ -250,7 +250,7 @@ end
 # ### Main run
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
-#                            P_missing_pools=0.5,
+#                            P_missing_pools=0.1,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            bool_OLS_dist=true,
