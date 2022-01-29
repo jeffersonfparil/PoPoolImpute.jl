@@ -150,13 +150,13 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
             n_bool_skip_leading_window = i>1 ### first chunk does not have a leading window
             n_bool_skip_trailing_window = i<n_int_chunk_count ### last chunk does not have trailing window
             fun_single_threaded_imputation(str_filename_chunk_input,
-                                n_int_window_size=n_int_window_size,
-                                n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
-                                n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
-                                str_filename_output=str_filename_chunk_output,
-                                n_bool_skip_leading_window=n_bool_skip_leading_window,
-                                n_bool_skip_trailing_window=n_bool_skip_trailing_window,
-                                bool_OLS_dist=bool_OLS_dist)
+                n_int_window_size=n_int_window_size,
+                n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
+                n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
+                str_filename_output=str_filename_chunk_output,
+                n_bool_skip_leading_window=n_bool_skip_leading_window,
+                n_bool_skip_trailing_window=n_bool_skip_trailing_window,
+                bool_OLS_dist=bool_OLS_dist)
         end
     else
         ### Non-parallel imputation for unsplit input file

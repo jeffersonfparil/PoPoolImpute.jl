@@ -100,7 +100,7 @@ function func_pairwise_loci_distances(vec_str_name_of_chromosome_or_scaffold, ve
     ### Hence, windows between overlapping chromosomes or scaffolds are not included in the imputation
     ### Maybe this will improve accuracy????!!!
     @inbounds for i in 1:p
-        @inbounds for j in 1:p
+        for j in 1:p
             if vec_str_name_of_chromosome_or_scaffold[i] == vec_str_name_of_chromosome_or_scaffold[j]
                 Z[i,j] = abs(vec_int_position[i] - vec_int_position[j])
             end

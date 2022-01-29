@@ -23,7 +23,7 @@ cd("test/")
 ###     (2) impute
 ###     (3) load imputation output, and
 ###     (4) check imputation accuracy
-function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_OLS_dist=false, n_int_number_of_iterations=1)
+function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_OLS_dist=false, n_int_number_of_iterations=1, n_int_thread_count=2)
     # ############################
     # ### TEST
     # input="test.pileup.tar.xz"
@@ -33,6 +33,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     # n_sequencing_read_length=10
     # bool_OLS_dist=false
     # n_int_number_of_iterations=1
+    # n_int_thread_count=2
     # ############################
     if input == "test.pileup.tar.xz"
         ### Uncompress test pileup file
@@ -62,12 +63,12 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         str_filename_output = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
         try
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
-                                                    n_int_window_size=window_size,
-                                                    n_flt_maximum_fraction_of_pools_with_missing=0.9,
-                                                    n_flt_maximum_fraction_of_loci_with_missing=0.9,
-                                                    str_filename_output=str_filename_output,
-                                                    bool_OLS_dist=bool_OLS_dist,
-                                                    n_int_thread_count=n_int_thread_count)==0
+                                           n_int_window_size=window_size,
+                                           n_flt_maximum_fraction_of_pools_with_missing=0.9,
+                                           n_flt_maximum_fraction_of_loci_with_missing=0.9,
+                                           str_filename_output=str_filename_output,
+                                           bool_OLS_dist=bool_OLS_dist,
+                                           n_int_thread_count=n_int_thread_count)==0
         catch
             @show "At least one of the chunks has too many missing data!"
             ### Clean-up defective chunk/s and the pileup with simulated missing data
