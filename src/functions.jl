@@ -94,17 +94,15 @@ end
 ### Compute pairwise loci distances
 function func_pairwise_loci_distances(vec_str_name_of_chromosome_or_scaffold, vec_int_position)
     p = length(vec_int_position)
-    Z = convert(Array{Any,2}, zeros(p, p))
-    for i in 1:p
-        for j in 1:p
+    Z = zeros(Int, p, p)
+    ### Set distance to missing for loci pairs in dfferent chromosomes or scaffolds
+    ### This won't result in imputation.
+    ### Hence, windows between overlapping chromosomes or scaffolds are not included in the imputation
+    ### Maybe this will improve accuracy????!!!
+    @inbounds for i in 1:p
+        @inbounds for j in 1:p
             if vec_str_name_of_chromosome_or_scaffold[i] == vec_str_name_of_chromosome_or_scaffold[j]
                 Z[i,j] = abs(vec_int_position[i] - vec_int_position[j])
-            else
-                ### Set distance to missing for loci pairs in dfferent chromosomes or scaffolds
-                ### This won't result in imputation.
-                ### Hence, windows between overlapping chromosomes or scaffolds are not included in the imputation
-                ### Maybe this will improve accuracy????!!!
-                Z[i,j] = missing
             end
         end
     end
