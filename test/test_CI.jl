@@ -31,6 +31,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     # P_missing_pools=0.5
     # P_missing_loci=0.5
     # n_sequencing_read_length=10
+    # bool_OLS_dist=false
     # n_int_number_of_iterations=1
     # ############################
     if input == "test.pileup.tar.xz"
@@ -46,7 +47,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     ### Using a while-try-catch expression to prevent failure when one of the chunks are too sparse due to the stochasticity of "2_simulate_missing_loci_in_pileup_file.sh"
     t = 0 ### iteration counter
     q = 0 ### error counter
-    q_max = 100 ### maximum number of error
+    q_max = 10 ### maximum number of error
     while (t < n_int_number_of_iterations) & ( q <= q_max)
         ### Set pseudo-randomisation seed
         Random.seed!(t+q)
@@ -62,8 +63,8 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         try
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
                                                     n_int_window_size=window_size,
-                                                    n_flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
-                                                    n_flt_maximum_fraction_of_loci_with_missing=P_missing_loci,
+                                                    n_flt_maximum_fraction_of_pools_with_missing=0.9,
+                                                    n_flt_maximum_fraction_of_loci_with_missing=0.9,
                                                     str_filename_output=str_filename_output,
                                                     bool_OLS_dist=bool_OLS_dist,
                                                     n_int_thread_count=n_int_thread_count)==0
@@ -238,7 +239,7 @@ end
 # ### Precompile with 1 iteration
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
-#                            P_missing_pools=0.1,
+#                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            bool_OLS_dist=true,
@@ -250,7 +251,7 @@ end
 # ### Main run
 # @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
 #                            window_size=200,
-#                            P_missing_pools=0.1,
+#                            P_missing_pools=0.5,
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            bool_OLS_dist=true,
