@@ -244,6 +244,7 @@ end
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            bool_OLS_dist=true,
+#                            n_int_thread_count=30,
 #                            n_int_number_of_iterations=1)
 # ### Clean-up
 # cd("/data-weedomics-1/ctDNA/")
@@ -256,4 +257,5 @@ end
 #                            P_missing_loci=0.5,
 #                            n_sequencing_read_length=100,
 #                            bool_OLS_dist=true,
+#                            n_int_thread_count=30,
 #                            n_int_number_of_iterations=100)
