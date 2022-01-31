@@ -3,7 +3,10 @@ module functions
 using Random
 using ProgressMeter
 using LinearAlgebra ### Load linear algebra library for the Moore-Penrose pseudoinverse if the automatic solver fails
-
+# using Statistics
+# using HypothesisTests
+# using MultivariateStats
+# using UnicodePlots
 
 ### ACSII to allele state parser per locus
 function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_allele_state, str_reference_allele, vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"])
@@ -109,28 +112,48 @@ function func_pairwise_loci_distances(vec_str_name_of_chromosome_or_scaffold, ve
     return(Z)
 end
 
+### Multivariate idge regression which selects the best tuning parameter lambda and assumes X's first column is ones, i.e for the intercept
+function fun_multivariate_ridge_regression(X, Y; n_flt_ln_lambda_minimum=-5, n_flt_ln_lambda_maximum=5, n_int_lambda_count=10, bool_plot=false)
+    ### Assumes X's first column is for the intercept
+    vec_flt_lambda = exp.(range(n_flt_ln_lambda_minimum, n_flt_ln_lambda_maximum, length=n_int_lambda_count))
+    vec_flt_MSE = Float64.([])
+    for lambda in vec_flt_lambda
+        # lambda = 0.006
+        B = MultivariateStats.ridge(Float64.(X), Float64.(Y), lambda, bias=false)
+        append!(vec_flt_MSE, sum((X*B - Y).^2)/size(Y,1))
+    end
+    if bool_plot
+        @show UnicodePlots.scatterplot(log.(vec_flt_lambda), vec_flt_MSE)
+    end
+    MultivariateStats.ridge(Float64.(X),
+                            Float64.(Y),
+                            vec_flt_lambda[vec_flt_MSE.==minimum(vec_flt_MSE)][1],
+                            bias=false)
+end
+
 ### Impute
 function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome_or_scaffold, vec_int_position, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5; bool_OLS_dist=false)
     ############################################# We're not dealing with depths here because I feel like it is more convenient and provides more flexibility to filter by depth after imputation
     ### TEST
-    # using PoPoolImpute
-    # cd("test")
-    # run(`tar -xvf test.pileup.tar.xz`)
-    # using Random; Random.seed!(8)
-    # PoPoolImpute.functions.fun_simulate_missing("test.pileup",
-    #                         n_sequencing_read_length=10,
-    #                         n_flt_maximum_fraction_of_loci_with_missing=0.5,
-    #                         n_flt_maximum_fraction_of_pools_with_missing=0.1,
-    #                         str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
-    # str_filename_input = "test-SIMULATED_MISSING.pileup"
-    # n_int_start_locus = 30 # 50
-    # n_int_window_size = 20
-    # vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
-    # vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
-    # @time vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
-    # n_flt_maximum_fraction_of_pools_with_missing = 0.1
-    # n_flt_maximum_fraction_of_loci_with_missing = 0.5
-    # bool_OLS_dist = false
+    using PoPoolImpute
+    cd("test")
+    run(`tar -xvf test.pileup.tar.xz`)
+    using Random; Random.seed!(69)
+    PoPoolImpute.functions.fun_simulate_missing("test.pileup",
+                            n_sequencing_read_length=10,
+                            n_flt_maximum_fraction_of_loci_with_missing=0.5,
+                            n_flt_maximum_fraction_of_pools_with_missing=0.1,
+                            str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
+    str_filename_input = "test-SIMULATED_MISSING.pileup"
+    n_int_start_locus = 1 # 50
+    n_int_window_size = 20
+    vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
+    vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
+    @time vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
+    n_flt_maximum_fraction_of_pools_with_missing = 0.9
+    n_flt_maximum_fraction_of_loci_with_missing = 0.9
+    bool_OLS_dist = false
+    n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
     #############################################
 
     ### Number of pools
@@ -170,29 +193,73 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
                 ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
                 Z = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
                                                 repeat(vec_int_position, inner=7))
-                X = Int.(hcat(Z[vec_bool_idx_loci_nomissing,:], X))
+                X = Int.(hcat(ones(size(X,1)), Z[vec_bool_idx_loci_nomissing,:], X))
             else
                 X = missing ### skip windows with overlapping chromosomes
             end
         end
         B = try
-            ### Automatic julia solver
-            X\Y
+            ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
+            hcat(ones(size(X,1)), X)\Y
         catch
             ### Moore-Penrose pseudoinverse if the automatic solver fails
             try
+                X = hcat(ones(size(X,1)), X)
                 LinearAlgebra.pinv(X'*X)*(X'*Y)
             catch
                 ### If singular and if Z has missing values which indicate loci in different chromosomes  or scaffolds are in the same window which does not work if we are accounting for loci distances
                 missing
             end
         end
+
+        # ###################################################################
+        # ###################################################################
+        # ###################################################################
+        # ### TESTS 20220131
+        # C = cor(X')
+        # C[isnan.(C)] .= 0.0
+        # UnicodePlots.heatmap(C)
+        # pvalue(CorrelationTest(X[1:,2,:]'))
+        
+
+        # A = mat_int_window_counts[vec_bool_idx_loci_nomissing,:]
+        # n, p = size(A)
+        # C = zeros(n, n)
+        # for i in 1:n
+        #     for j in i:n
+        #         C[i,j] = C[j,i] = pvalue(CorrelationTest(A[i,:], A[j,:]))
+        #     end
+        # end
+
+        # @time X\Y
+        # @time pinv(X'*X)*X'*Y ### not equal to above and below why?!?!?
+        # @time X'*pinv(X*X')*Y
+
+        # Q, R, p = qr(X, ColumnNorm())
+        # P = diagm(p)
+        # (P*inv(R)*Q')*Y
+
+        # ### Ridge works just fine - will test and will need to refactor this function and functions upstream
+        # @time B = fun_multivariate_ridge_regression(hcat(ones(size(X,1)),X),
+        #                                     Y, 
+        #                                     n_flt_ln_lambda_minimum=-5,
+        #                                     n_flt_ln_lambda_maximum=5,
+        #                                     n_int_lambda_count=10,
+        #                                     bool_plot=false)
+        # using GLMNet
+        # GLMNet.glmnet(X,Y, family="mgaussian")
+        # ###################################################################
+        # ###################################################################
+        # ###################################################################
+
+      
         ### If our solver fails return missing
         if ismissing(B)
             Y_pred = missing
         else
             ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
-            X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
+            X_locus_with_missing = hcat(ones(sum(vec_bool_idx_loci_missing)),
+                                        mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci])
             if bool_OLS_dist
                 X_locus_with_missing = hcat(Z[vec_bool_idx_loci_missing,:], X_locus_with_missing)
             end
