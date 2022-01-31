@@ -181,8 +181,8 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
         ###########################################################################################################
         ### allele counts of pools with missing loci at loci with missing data (m_P non-missing loci x n_M pools with missing loci)
         Y = Number.(mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_with_missing_loci])
-        ### allele counts of pools without missing loci at loci with missing data (m_P non-missing loci x n_P pools without missing locus)
-        X = Number.(mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_without_missing_loci])
+        ### allele counts of pools without missing loci at loci with missing data (m_P non-missing loci x n_P pools without missing locus) + first column is for the intercept
+        X = Number.(hcat(ones(sum(vec_bool_idx_loci_nomissing)), mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_without_missing_loci]))
         ### predictors of allele counts in the pools with missing loci (n_P pools without missing missing loci x n_M pools with missing loci)
         ### Model the distribution of allele frequencies among the pools with missing data
         ###     as functions of the allele frequencies of the pools without missing data
@@ -193,18 +193,17 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
                 ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
                 Z = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
                                                 repeat(vec_int_position, inner=7))
-                X = Int.(hcat(ones(size(X,1)), Z[vec_bool_idx_loci_nomissing,:], X))
+                X = Int.(hcat(X[:,1], Z[vec_bool_idx_loci_nomissing,:], X[:,2:end]))
             else
                 X = missing ### skip windows with overlapping chromosomes
             end
         end
         B = try
             ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
-            hcat(ones(size(X,1)), X)\Y
+            X\Y
         catch
             ### Moore-Penrose pseudoinverse if the automatic solver fails
             try
-                X = hcat(ones(size(X,1)), X)
                 LinearAlgebra.pinv(X'*X)*(X'*Y)
             catch
                 ### If singular and if Z has missing values which indicate loci in different chromosomes  or scaffolds are in the same window which does not work if we are accounting for loci distances
