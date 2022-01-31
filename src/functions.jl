@@ -135,25 +135,25 @@ end
 function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome_or_scaffold, vec_int_position, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5; bool_OLS_dist=false)
     ############################################# We're not dealing with depths here because I feel like it is more convenient and provides more flexibility to filter by depth after imputation
     ### TEST
-    using PoPoolImpute
-    cd("test")
-    run(`tar -xvf test.pileup.tar.xz`)
-    using Random; Random.seed!(69)
-    PoPoolImpute.functions.fun_simulate_missing("test.pileup",
-                            n_sequencing_read_length=10,
-                            n_flt_maximum_fraction_of_loci_with_missing=0.5,
-                            n_flt_maximum_fraction_of_pools_with_missing=0.1,
-                            str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
-    str_filename_input = "test-SIMULATED_MISSING.pileup"
-    n_int_start_locus = 1 # 50
-    n_int_window_size = 20
-    vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
-    vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
-    @time vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
-    n_flt_maximum_fraction_of_pools_with_missing = 0.9
-    n_flt_maximum_fraction_of_loci_with_missing = 0.9
-    bool_OLS_dist = false
-    n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
+    # using PoPoolImpute
+    # cd("test")
+    # run(`tar -xvf test.pileup.tar.xz`)
+    # using Random; Random.seed!(69)
+    # PoPoolImpute.functions.fun_simulate_missing("test.pileup",
+    #                         n_sequencing_read_length=10,
+    #                         n_flt_maximum_fraction_of_loci_with_missing=0.5,
+    #                         n_flt_maximum_fraction_of_pools_with_missing=0.1,
+    #                         str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
+    # str_filename_input = "test-SIMULATED_MISSING.pileup"
+    # n_int_start_locus = 1 # 50
+    # n_int_window_size = 20
+    # vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
+    # vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
+    # @time vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
+    # n_flt_maximum_fraction_of_pools_with_missing = 0.9
+    # n_flt_maximum_fraction_of_loci_with_missing = 0.9
+    # bool_OLS_dist = false
+    # n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
     #############################################
 
     ### Number of pools
