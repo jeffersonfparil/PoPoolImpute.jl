@@ -15,7 +15,10 @@ PopPoolImpute.impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fra
 2. *n_int_window_size* [Integer; default=10]: size of the sliding window across which imputation is performed
 3. *n_flt_maximum_fraction_of_pools_with_missing* [Float; default=0.5]: maximum tolerable fraction of the pools with at least one missing locus
 4. *n_flt_maximum_fraction_of_loci_with_missing* [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
-5. *n_int_thread_count* [Integer; default=1]: number of computing threads to use
+5. *bool_use_distance_matrix* [Boolean; default=false]: perform ordinary least squares regression with pairwise loci distances covariate
+6. *str_model* [String; default="OLS"]: imputation model to use. Choose from "Mean" (average counts in the non-missing pools), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator), and "GLMNET" (elastic net with additional parameter flt_glmnet_alpha; default=0.5)
+
+7. *n_int_thread_count* [Integer; default=1]: number of computing threads to use
 
 # Output
 *str_filename_output* [String; default="output-imputed.syncx"; comma-separated file]
@@ -47,11 +50,11 @@ PoPoolImpute.impute(str_filename_input, str_filename_output="multithreaded.syncx
 ```
 # Details
 
-Performs a simple least squares linear regression to predict missing allele counts per window:
+Performs simple mean extrapolation and various linear regression algorithms to predict missing allele counts per window:
 
 **Xₚₘ = XₚₚB**
 
-**→ B̂ = inverse(XₚₚᵀXₚₚ) (XₚₚᵀXₚₘ)**.
+**→ B̂ = F(Xₚₚ, Xₚₘ, ...)**.
 
 Imputation is achieved by predicting the missing allele counts:
 
@@ -62,12 +65,8 @@ Where:
 - **Xₚₘ** is the matrix of allele counts of pools with missing data at the loci without missing data (dimensions: **mₚ** non-missing loci × 7 alleles, **nₘ** pools with missing loci);
 - **Xₚₚ** is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: **mₚ** non-missing loci × 7 alleles, **nₚ** pools without missing loci);
 - **B̂** is the matrix of estimates of the effects of each pool without missing data on the allele counts of the pools with missing data (dimensions: **nₚ** pools without missing loci, **nₘ** pools with missing loci);
-- **inverse()** is the Moore-Penrose pseudoinverse if the automatic Julia solver fails;
+- **F()** refers to any of the imputation models implemented, i.e. means of th non-missing pools, ordinary least squares, ridge regression, LASSO, and elastic net regularisation;
 - **X̂ₘₘ** is the matrix of imputed allele counts of pools with missing data (dimensions: **mₘ** missing loci × 7 alleles, **nₘ** pools with missing loci); and
 - **Xₘₚ** is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: **mₘ** non-missing loci × 7 alleles, **nₚ** pools without missing loci).
 
 The imputed allele counts are averaged across the windows sliding one locus at a time.
-
-# Notes
-
-The current algorithm is agnostic of the distances between markers. We plan on using the distance information as well as test penalised regression, i.e. ridge, regression, LASSO, and elastic-net.

@@ -60,7 +60,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                              flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
                              str_filename_pileup_simulated_missing=str_filename_withMissing)
         ### Impute (catch errors when the input file is too sparse, and re-run simulation of missing data)
-        str_filename_output = string(str_output_prefix, "-", join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
+        str_filename_output = string(dirname(str_filename_pilelup_no_missing_loci), "/", str_output_prefix, "-", join(split(basename(str_filename_pilelup_no_missing_loci), '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
         try
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
                                            int_window_size=window_size,
@@ -227,7 +227,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
 end
 
 ### Test on all combinations of the model building methods
-for bool_use_distance_matrix in [true, false]
+for bool_use_distance_matrix in [false, true]
     for str_model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
         println("###########################################")
         println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
@@ -237,43 +237,44 @@ for bool_use_distance_matrix in [true, false]
     end
 end
 
-# ### MISC: USING OTHER DATASETS
-# ### Accuracy assessment
-# using Test
-# using Pkg
-# using ProgressMeter
-# using UnicodePlots
-# using Random
-# using Distributed
-# int_thread_count = 30
-# Distributed.addprocs(int_thread_count)
-# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# @everywhere using PoPoolImpute
-# ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
+### MISC: USING OTHER DATASETS
+### Accuracy assessment
+using Test
+using Pkg
+using ProgressMeter
+using UnicodePlots
+using Random
+using Distributed
+int_thread_count = 30
+Distributed.addprocs(int_thread_count)
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+@everywhere using PoPoolImpute
 
-# int_reps = 10
-# vec_str_dist_model = []
-# for str_dist in ["false", "true"]
-#     for str_mod in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
-#         push!(vec_str_dist_model, string(str_dist, "-", str_mod))
-#     end
-# end
+### NOTE!!!!! Manually load fun_sim_impute_check() from above.
 
-# vec_str_dist_model = repeat(vec_str_dist_model, int_reps)
-# vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
-# for i in 1:length(vec_str_dist_model)
-#     # i = 1
-#     vec_str_dist_mod = split(vec_str_dist_model[i], "-")
-#     bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
-#     str_model = vec_str_dist_mod[2]
-#     @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
-#                             window_size=200,
-#                             P_missing_pools=0.5,
-#                             P_missing_loci=0.5,
-#                             n_sequencing_read_length=100,
-#                             bool_use_distance_matrix=bool_use_distance_matrix,
-#                             str_model=str_model,
-#                             int_thread_count=30,
-#                             str_output_prefix=vec_str_dist_model[i],
-#                             int_number_of_iterations=1)
-# end
+int_reps = 10
+vec_str_dist_model = []
+for str_dist in ["false", "true"]
+    for str_mod in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
+        push!(vec_str_dist_model, string(str_dist, "-", str_mod))
+    end
+end
+
+vec_str_dist_model = repeat(vec_str_dist_model, int_reps)
+vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
+@time for i in 1:length(vec_str_dist_model)
+    # i = 1
+    vec_str_dist_mod = split(vec_str_dist_model[i], "-")
+    bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
+    str_model = vec_str_dist_mod[2]
+    @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+                            window_size=200,
+                            P_missing_pools=0.5,
+                            P_missing_loci=0.5,
+                            n_sequencing_read_length=100,
+                            bool_use_distance_matrix=bool_use_distance_matrix,
+                            str_model=str_model,
+                            int_thread_count=30,
+                            str_output_prefix=vec_str_dist_model[i],
+                            int_number_of_iterations=1)
+end
