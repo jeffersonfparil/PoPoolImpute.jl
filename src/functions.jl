@@ -3,18 +3,17 @@ module functions
 using Random
 using ProgressMeter
 using LinearAlgebra ### Load linear algebra library for the Moore-Penrose pseudoinverse if the automatic solver fails
-# using Statistics
-# using HypothesisTests
-# using MultivariateStats
-# using UnicodePlots
+using MultivariateStats
+using Lasso
+using GLMNet
 
 ### ACSII to allele state parser per locus
 function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_allele_state, str_reference_allele, vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"])
-    n_int_allele_count = length(vec_allele_names)
-    n_int_pool_count = length(vec_str_allele_state)
-    mat_allele_counts_n_int_pools_x_m_alleles = Array{Any, 2}(missing, n_int_allele_count, n_int_pool_count)
+    int_allele_count = length(vec_allele_names)
+    int_pool_count = length(vec_str_allele_state)
+    mat_allele_counts_int_pools_x_m_alleles = Array{Any, 2}(missing, int_allele_count, int_pool_count)
     dic_allele_counts = Dict()
-    for j in 1:n_int_pool_count
+    for j in 1:int_pool_count
         # j = 4
         if vec_int_depth[j] > 0
             str_pool_state = replace(vec_str_allele_state[j], Regex("\\^.") => "") ### remove alignment start and mapping quality strings
@@ -24,23 +23,23 @@ function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_alle
                 dic_allele_counts[allele] = 0
             end
             # println(str_pool_state)
-            n_int_counter = 0
-            while n_int_counter < length(vec_str_split_state)
-                n_int_counter += 1
+            int_counter = 0
+            while int_counter < length(vec_str_split_state)
+                int_counter += 1
                 # println("########################")
                 # println(j)
-                # println(n_int_counter)
-                str_state = uppercase(vec_str_split_state[n_int_counter])
+                # println(int_counter)
+                str_state = uppercase(vec_str_split_state[int_counter])
                 if (str_state==".") | (str_state==",")
                     dic_allele_counts[uppercase(str_reference_allele)] += 1
                 elseif str_state == "+"
                     dic_allele_counts["INS"] += 1
-                    n_length_deletion_sequence = parse(Int, vec_str_split_state[n_int_counter+1])
-                    n_int_counter = n_int_counter + 1 + 1 + n_length_deletion_sequence ### remove deletion sequence and go to the next state
+                    n_length_deletion_sequence = parse(Int, vec_str_split_state[int_counter+1])
+                    int_counter = int_counter + 1 + 1 + n_length_deletion_sequence ### remove deletion sequence and go to the next state
                 elseif str_state == "-"
                     dic_allele_counts["DEL"] += 1
-                    n_length_deletion_sequence = parse(Int, vec_str_split_state[n_int_counter+1])
-                    n_int_counter = n_int_counter + 1 + n_length_deletion_sequence ### remove deletion sequence
+                    n_length_deletion_sequence = parse(Int, vec_str_split_state[int_counter+1])
+                    int_counter = int_counter + 1 + n_length_deletion_sequence ### remove deletion sequence
                 elseif str_state == "*"
                     dic_allele_counts["DEL"] += 1
                 elseif str_state ∈ vec_allele_names
@@ -56,22 +55,22 @@ function fun_ascii_allele_states_to_counts_per_locus(vec_int_depth, vec_str_alle
         end
         for k in 1:length(vec_allele_names)
             # k = 1
-            mat_allele_counts_n_int_pools_x_m_alleles[k, j] = dic_allele_counts[vec_allele_names[k]]
+            mat_allele_counts_int_pools_x_m_alleles[k, j] = dic_allele_counts[vec_allele_names[k]]
         end
     end
-    return(mat_allele_counts_n_int_pools_x_m_alleles)
+    return(mat_allele_counts_int_pools_x_m_alleles)
 end
 
 ### Pileup window to allele counts (n pools x (6 loci x m-loci windows))
 function fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"])
-    n_int_window_size = length(vec_str_input)
-    n_int_allele_count = length(vec_allele_names)
-    n_int_pool_count = Int((length(split(vec_str_input[1], "\t")) - 3) / 3)
+    int_window_size = length(vec_str_input)
+    int_allele_count = length(vec_allele_names)
+    int_pool_count = Int((length(split(vec_str_input[1], "\t")) - 3) / 3)
     ### Inititialise matrix of allele counts across pools and loci within the window
     vec_str_name_of_chromosome_or_scaffold = []
     vec_int_position = Int.([])
-    mat_int_window_counts = Array{Any,2}(missing, n_int_allele_count*n_int_window_size, n_int_pool_count)
-    for i in 1:n_int_window_size
+    mat_int_window_counts = Array{Any,2}(missing, int_allele_count*int_window_size, int_pool_count)
+    for i in 1:int_window_size
         # i = 1 ### test 1 specific locus
         # println(i)
         vec_line = split(vec_str_input[i], "\t")
@@ -83,8 +82,8 @@ function fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_
         vec_int_depth = parse.(Int, mat_depth_state_quality[1,:])
         vec_str_allele_state = mat_depth_state_quality[2,:]
         # vec_str_allele_qualtity = mat_depth_state_quality[3,:]
-        n_idx_start = (n_int_allele_count*(i-1)) + 1
-        n_idx_end   = (n_int_allele_count*(i-0))
+        n_idx_start = (int_allele_count*(i-1)) + 1
+        n_idx_end   = (int_allele_count*(i-0))
         # println("############################")
         mat_int_window_counts[n_idx_start:n_idx_end, :] = fun_ascii_allele_states_to_counts_per_locus(vec_int_depth,
                                                                                                       vec_str_allele_state,
@@ -112,10 +111,10 @@ function func_pairwise_loci_distances(vec_str_name_of_chromosome_or_scaffold, ve
     return(Z)
 end
 
-### Multivariate idge regression which selects the best tuning parameter lambda and assumes X's first column is ones, i.e for the intercept
-function fun_multivariate_ridge_regression(X, Y; n_flt_ln_lambda_minimum=-5, n_flt_ln_lambda_maximum=5, n_int_lambda_count=10, bool_plot=false)
+### Multivariate ridge regression which selects the best tuning parameter lambda, and assumes X's first column is ones, i.e for the intercept
+function fun_multivariate_ridge_regression(X, Y; flt_ln_lambda_minimum=-5, flt_ln_lambda_maximum=5, int_lambda_count=10, bool_plot=false)
     ### Assumes X's first column is for the intercept
-    vec_flt_lambda = exp.(range(n_flt_ln_lambda_minimum, n_flt_ln_lambda_maximum, length=n_int_lambda_count))
+    vec_flt_lambda = exp.(range(flt_ln_lambda_minimum, flt_ln_lambda_maximum, length=int_lambda_count))
     vec_flt_MSE = Float64.([])
     for lambda in vec_flt_lambda
         # lambda = 0.006
@@ -126,38 +125,38 @@ function fun_multivariate_ridge_regression(X, Y; n_flt_ln_lambda_minimum=-5, n_f
         @show UnicodePlots.scatterplot(log.(vec_flt_lambda), vec_flt_MSE)
     end
     MultivariateStats.ridge(Float64.(X),
-                            Float64.(Y),
-                            vec_flt_lambda[vec_flt_MSE.==minimum(vec_flt_MSE)][1],
-                            bias=false)
+          Float64.(Y),
+          vec_flt_lambda[vec_flt_MSE.==minimum(vec_flt_MSE)][1],
+          bias=false)
 end
 
 ### Impute
-function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome_or_scaffold, vec_int_position, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5; bool_OLS_dist=false)
+function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome_or_scaffold, vec_int_position, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5; bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5)
     ############################################# We're not dealing with depths here because I feel like it is more convenient and provides more flexibility to filter by depth after imputation
     ### TEST
     # using PoPoolImpute
-    # cd("test")
+    # cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/")
     # run(`tar -xvf test.pileup.tar.xz`)
     # using Random; Random.seed!(69)
     # PoPoolImpute.functions.fun_simulate_missing("test.pileup",
     #                         n_sequencing_read_length=10,
-    #                         n_flt_maximum_fraction_of_loci_with_missing=0.5,
-    #                         n_flt_maximum_fraction_of_pools_with_missing=0.1,
+    #                         flt_maximum_fraction_of_loci_with_missing=0.5,
+    #                         flt_maximum_fraction_of_pools_with_missing=0.1,
     #                         str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
     # str_filename_input = "test-SIMULATED_MISSING.pileup"
-    # n_int_start_locus = 1 # 50
-    # n_int_window_size = 20
-    # vec_str_input = readlines(str_filename_input)[n_int_start_locus:(n_int_start_locus+n_int_window_size-1)]
+    # int_start_locus = 10
+    # int_window_size = 20
+    # vec_str_input = readlines(str_filename_input)[int_start_locus:(int_start_locus+int_window_size-1)]
     # vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
     # @time vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
-    # n_flt_maximum_fraction_of_pools_with_missing = 0.9
-    # n_flt_maximum_fraction_of_loci_with_missing = 0.9
-    # bool_OLS_dist = false
+    # flt_maximum_fraction_of_pools_with_missing = 0.9
+    # flt_maximum_fraction_of_loci_with_missing = 0.9
+    # bool_use_distance_matrix = false
     # n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
     #############################################
 
     ### Number of pools
-    n_int_window_size_x_7_alleles, n_int_pool_count = size(mat_int_window_counts)
+    int_window_size_x_7_alleles, int_pool_count = size(mat_int_window_counts)
     
     ### Find coordinates of missing loci
     mat_bool_missing = ismissing.(mat_int_window_counts)
@@ -169,8 +168,8 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     vec_bool_idx_loci_nomissing = .!vec_bool_idx_loci_missing
 
     ### Test if we have enough pools with no missing loci to build our imputation model
-    n_bool_do_we_have_enough_pools = sum(vec_bool_idx_pools_with_missing_loci) <= (n_flt_maximum_fraction_of_pools_with_missing*n_int_pool_count)
-    n_bool_do_we_have_enough_loci  = sum(vec_bool_idx_loci_missing)            <= (n_flt_maximum_fraction_of_loci_with_missing *n_int_window_size_x_7_alleles)
+    n_bool_do_we_have_enough_pools = sum(vec_bool_idx_pools_with_missing_loci) <= (flt_maximum_fraction_of_pools_with_missing*int_pool_count)
+    n_bool_do_we_have_enough_loci  = sum(vec_bool_idx_loci_missing)            <= (flt_maximum_fraction_of_loci_with_missing *int_window_size_x_7_alleles)
 
     if n_bool_do_we_have_enough_pools & n_bool_do_we_have_enough_loci
         ###########################################################################################################
@@ -187,80 +186,80 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
         ### Model the distribution of allele frequencies among the pools with missing data
         ###     as functions of the allele frequencies of the pools without missing data
         bool_overlapping_chromomosomes = length(unique(vec_str_name_of_chromosome_or_scaffold)) > 1
-        if bool_OLS_dist
+        if bool_use_distance_matrix
             if !bool_overlapping_chromomosomes
                 ### Adding distance convariates
                 ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
                 Z = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
-                                                repeat(vec_int_position, inner=7))
+                                                 repeat(vec_int_position, inner=7))
                 X = Int.(hcat(X[:,1], Z[vec_bool_idx_loci_nomissing,:], X[:,2:end]))
             else
                 X = missing ### skip windows with overlapping chromosomes
             end
         end
-        B = try
-            ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
-            X\Y
-        catch
-            ### Moore-Penrose pseudoinverse if the automatic solver fails
-            try
-                LinearAlgebra.pinv(X'*X)*(X'*Y)
+        if str_model == "Mean"
+            B = nothing
+        elseif str_model == "OLS"
+            B = try
+                ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
+                X\Y
             catch
-                ### If singular and if Z has missing values which indicate loci in different chromosomes  or scaffolds are in the same window which does not work if we are accounting for loci distances
                 missing
             end
+        elseif str_model == "RR"
+            B = try
+                fun_multivariate_ridge_regression(X, Y)
+            catch
+                missing
+            end
+        elseif str_model== "LASSO" ### Note: iterative per column of Y
+            B = try
+                B = zeros(size(X,2), size(Y,2))
+                for j in 1:size(Y,2)
+                    B[:,j] = try
+                        Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(Y[:,j]), standardize=false, intercept=true, cd_tol=1e-7))
+                    catch
+                        Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(Y[:,j]), standardize=false, intercept=true, cd_tol=1e-3))
+                    end
+                end
+                B
+            catch
+                missing
+            end
+        elseif str_model== "GLMNET" ### Note: iterative per column of Y
+            ### Default: flt_glmnet_alpha=0.5
+            try
+                B = zeros(size(X,2), size(Y,2))
+                for j in 1:size(Y,2)
+                    B[:,j] = try
+                        GLMNet.coef(GLMNet.glmnetcv(X, Y[:,j], alpha=flt_glmnet_alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
+                    catch
+                        GLMNet.coef(GLMNet.glmnetcv(X, Y[:,j], alpha=flt_glmnet_alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
+                    end
+                end
+            catch
+                B = missing
+            end
+        else
+            println("Wrong model specified.")
+            println("Exiting.")
+            exit()
         end
-
-        # ###################################################################
-        # ###################################################################
-        # ###################################################################
-        # ### TESTS 20220131
-        # C = cor(X')
-        # C[isnan.(C)] .= 0.0
-        # UnicodePlots.heatmap(C)
-        # pvalue(CorrelationTest(X[1:,2,:]'))
-        
-
-        # A = mat_int_window_counts[vec_bool_idx_loci_nomissing,:]
-        # n, p = size(A)
-        # C = zeros(n, n)
-        # for i in 1:n
-        #     for j in i:n
-        #         C[i,j] = C[j,i] = pvalue(CorrelationTest(A[i,:], A[j,:]))
-        #     end
-        # end
-
-        # @time X\Y
-        # @time pinv(X'*X)*X'*Y ### not equal to above and below why?!?!?
-        # @time X'*pinv(X*X')*Y
-
-        # Q, R, p = qr(X, ColumnNorm())
-        # P = diagm(p)
-        # (P*inv(R)*Q')*Y
-
-        # ### Ridge works just fine - will test and will need to refactor this function and functions upstream
-        # @time B = fun_multivariate_ridge_regression(hcat(ones(size(X,1)),X),
-        #                                     Y, 
-        #                                     n_flt_ln_lambda_minimum=-5,
-        #                                     n_flt_ln_lambda_maximum=5,
-        #                                     n_int_lambda_count=10,
-        #                                     bool_plot=false)
-        # using GLMNet
-        # GLMNet.glmnet(X,Y, family="mgaussian")
-        # ###################################################################
-        # ###################################################################
-        # ###################################################################
-
-      
-        ### If our solver fails return missing
+        ### If our solvers fail return missing
         if ismissing(B)
             Y_pred = missing
+        elseif str_model == "Mean"
+            X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
+            Y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
+                                    outer=sum(vec_bool_idx_pools_with_missing_loci)),
+                             (size(X_locus_with_missing,1), sum(vec_bool_idx_pools_with_missing_loci)))
+
         else
             ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
             X_locus_with_missing = hcat(ones(sum(vec_bool_idx_loci_missing)),
                                         mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci])
-            if bool_OLS_dist
-                X_locus_with_missing = hcat(Z[vec_bool_idx_loci_missing,:], X_locus_with_missing)
+            if bool_use_distance_matrix
+                X_locus_with_missing = hcat(X_locus_with_missing[:,1], Z[vec_bool_idx_loci_missing,:], X_locus_with_missing[:,2:end])
             end
             ### prediced allele counts at the loci with missing data (m_M missing loci x n_M pools with missing loci)
             Y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
@@ -278,18 +277,18 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
 end
 
 ### Simple progress bar
-function fun_simple_progress_bar(n_int_current, n_int_max, n_int_length=50)
+function fun_simple_progress_bar(int_current, int_max, int_length=50)
     ######################
     ### TEST
-    # n_int_current = 50
-    # n_int_max = 100
-    # n_int_length = 50
+    # int_current = 50
+    # int_max = 100
+    # int_length = 50
     ######################
-    flt_factor = n_int_length / n_int_max
-    str_progress = repeat("#", Int(round(n_int_current*flt_factor)))
-    str_pending =  repeat("-", Int(round((n_int_max-n_int_current)*flt_factor)))
-    flt_perc_done = round(n_int_current * 100 / n_int_max, digits=2)
-    if n_int_current != n_int_max
+    flt_factor = int_length / int_max
+    str_progress = repeat("#", Int(round(int_current*flt_factor)))
+    str_pending =  repeat("-", Int(round((int_max-int_current)*flt_factor)))
+    flt_perc_done = round(int_current * 100 / int_max, digits=2)
+    if int_current != int_max
         print("Progress [$str_progress$str_pending] $flt_perc_done% \u001b[1000D")
     else
         ### Keep the progress bar printed out
@@ -298,42 +297,42 @@ function fun_simple_progress_bar(n_int_current, n_int_max, n_int_length=50)
 end
 
 ### split pileup file into chunks
-function fun_split_pileup(str_filename_input; n_int_chunk_count=2, n_int_chuck_size=1e6, n_int_window_size=100, n_bool_add_leading_trailing_windows=true)
+function fun_split_pileup(str_filename_input; int_chunk_count=2, int_chuck_size=1e6, int_window_size=100, n_bool_add_leading_trailing_windows=true)
     ######################
     ### TEST
     # str_filename_input = "test.pileup"
-    # n_int_chunk_count = 2
-    # n_int_chuck_size = 20
-    # n_int_window_size = 10
+    # int_chunk_count = 2
+    # int_chuck_size = 20
+    # int_window_size = 10
     # n_bool_add_leading_trailing_windows = true
     ######################
-    println(string("Split the input pileup file into: ", n_int_chunk_count, " chunks of size: ", n_int_chuck_size, " + 2x", n_int_window_size, " loci each (at most)."))
+    println(string("Split the input pileup file into: ", int_chunk_count, " chunks of size: ", int_chuck_size, " + 2x", int_window_size, " loci each (at most)."))
     ### Cut up the input file and add leading and/or trailing windows so that we get average imputated frequencies across sliding windows seamlessly
     open(str_filename_input) do FILE
         ### Split into chunks if we are to split the pileup into more than 1 chunk
-        if n_int_chunk_count > 1
-            for i in 1:n_int_chunk_count
+        if int_chunk_count > 1
+            for i in 1:int_chunk_count
                 j = 0 ### locus counter per chunk
                 ### Open the chunk files (classified as the current, previous, and next chunks in order to append their respective leading and/or trailing windows)
                 file_current = open(string(str_filename_input, "-CHUNK_", i), "a")
                 if n_bool_add_leading_trailing_windows
                     i > 1                 ? file_previous = open(string(str_filename_input, "-CHUNK_", i-1), "a") : nothing ### first chunk does not have a leading window
-                    i < n_int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing ### last chunk does not have trailing window
+                    i < int_chunk_count ? file_next = open(string(str_filename_input, "-CHUNK_", i+1), "a") :     nothing ### last chunk does not have trailing window
                 end
                 ### Write the line into each chunk file until we reach the chunk size (up to a maximum of chunk size + 2 x window size; accounting for the leading and/or tailing windows)
-                while (j < n_int_chuck_size) & (!eof(FILE))
+                while (j < int_chuck_size) & (!eof(FILE))
                     j += 1
                     line = readline(FILE)
                     ### fill up current chunk
                     write(file_current, string(line, '\n'))
                     if n_bool_add_leading_trailing_windows
                         ### add leading window of the current chunk as the trailing window of previous chunk
-                        if (j <= n_int_window_size) & (i > 1)
+                        if (j <= int_window_size) & (i > 1)
                             ### Note that the first chunk does not have a leading window
                             write(file_previous, string(line, '\n'))
                         end
                         ### add trailing window of current chunk as the leading window of the next chunk
-                        if (j >= (n_int_chuck_size-(n_int_window_size-1))) & (i < n_int_chunk_count)
+                        if (j >= (int_chuck_size-(int_window_size-1))) & (i < int_chunk_count)
                             ### Note that the last chunk does not have trailing window
                             write(file_next, string(line, '\n'))
                         end
@@ -343,7 +342,7 @@ function fun_split_pileup(str_filename_input; n_int_chunk_count=2, n_int_chuck_s
                 close(file_current)
                 if n_bool_add_leading_trailing_windows
                     i > 1                 ? close(file_previous) : nothing ### first chunk does not have a leading window
-                    i < n_int_chunk_count ? close(file_next) :     nothing ### last chunk does not have trailing window
+                    i < int_chunk_count ? close(file_next) :     nothing ### last chunk does not have trailing window
                 end
             end
         else
@@ -353,15 +352,15 @@ function fun_split_pileup(str_filename_input; n_int_chunk_count=2, n_int_chuck_s
 end
 
 ### Write file into disk (for writing the output one locus at a time as the imputation algorithm runs iteratively across sliding windows)
-function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSITION, mat_int_ALLELE_COUNTS, n_int_allele_count, str_filename_output)
+function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSITION, mat_int_ALLELE_COUNTS, int_allele_count, str_filename_output)
     if !isa(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, Array)
         vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = [vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD]
     end
     if !isa(vec_int_POSITION, Array)
         vec_int_POSITION = [vec_int_POSITION]
     end
-    OUT = hcat(repeat(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, inner=n_int_allele_count),
-               repeat(vec_int_POSITION, inner=n_int_allele_count),
+    OUT = hcat(repeat(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, inner=int_allele_count),
+               repeat(vec_int_POSITION, inner=int_allele_count),
                mat_int_ALLELE_COUNTS)
     out = join([join(x,',') for x in eachrow(OUT)], '\n')
     file = open(str_filename_output, "a")
@@ -370,58 +369,58 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
 end
 
 ### Single-threaded imputaion
-function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true, bool_OLS_dist=false)
+function fun_single_threaded_imputation(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5)
     ###################################################################
     ### TEST
     # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
     # str_filename_input = "out_simissing.pileup"
-    # n_int_window_size = 10
-    # n_flt_maximum_fraction_of_pools_with_missing = 0.5
-    # n_flt_maximum_fraction_of_loci_with_missing = 0.5
+    # int_window_size = 10
+    # flt_maximum_fraction_of_pools_with_missing = 0.5
+    # flt_maximum_fraction_of_loci_with_missing = 0.5
     # str_filename_output = "output-imputed.syncx"
     # n_bool_skip_leading_window = true
     # n_bool_skip_trailing_window = true
     ###################################################################
     ### Count the number of loci, alleles, and pools (check if we have the expected number of columns in the first line of the pileup file, i.e. each pool has 3 columns each)
-    n_int_total_loci = countlines(str_filename_input)
+    int_total_loci = countlines(str_filename_input)
     vec_allele_names=["A", "T", "C", "G", "INS", "DEL", "N"]
-    n_int_allele_count = length(vec_allele_names)
+    int_allele_count = length(vec_allele_names)
     FILE_to_find_pool_count = open(str_filename_input)
     vec_line = split(readline(FILE_to_find_pool_count), "\t")
     close(FILE_to_find_pool_count)
-    n_int_pool_count = (length(vec_line) - 3) / 3
-    if n_int_pool_count == round(n_int_pool_count)
-        n_int_pool_count = Int(n_int_pool_count)
+    int_pool_count = (length(vec_line) - 3) / 3
+    if int_pool_count == round(int_pool_count)
+        int_pool_count = Int(int_pool_count)
     else
         @show "Ooopsss! Pileup file is corrupted."
-        @show string("Expected: ", Int(round(n_int_pool_count)), " pools but got ", n_int_pool_count, " pools instead.")
+        @show string("Expected: ", Int(round(int_pool_count)), " pools but got ", int_pool_count, " pools instead.")
         @show "Please check that each pool or population has 3 columns representing the depth, allele state, and allele quality."
     end
     ### Initialise the vectors of scaffold or chromosome names and positions
     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = []
     vec_int_POSITION = []
     mat_int_ALLELE_COUNTS = nothing
-    ### Initialise loci within window counter, vector containing each line (will fit a maximum of n_int_window_size loci), and open the file
-    n_int_counter_load_first_n_windows_lines_withe_readline = 0
+    ### Initialise loci within window counter, vector containing each line (will fit a maximum of int_window_size loci), and open the file
+    int_counter_load_first_n_windows_lines_withe_readline = 0
     vec_str_input = []
     FILE = open(str_filename_input)
     ### Iterate per line until we reach the first loci of the last sliding window
-    for n_int_start_locus in 1:((n_int_total_loci-n_int_window_size) + 1)
-        # n_int_start_locus = 25
-        # @show n_int_start_locus
-        # fun_simple_progress_bar(n_int_start_locus, (n_int_total_loci-n_int_window_size) + 1, 50)
-        ### If we already have "n_int_window_size" lines then just remove the old locus and replace with the next one since we have sliding windows (sliding one locus at a time)
-        if n_int_counter_load_first_n_windows_lines_withe_readline == n_int_window_size
+    for int_start_locus in 1:((int_total_loci-int_window_size) + 1)
+        # int_start_locus = 25
+        # @show int_start_locus
+        # fun_simple_progress_bar(int_start_locus, (int_total_loci-int_window_size) + 1, 50)
+        ### If we already have "int_window_size" lines then just remove the old locus and replace with the next one since we have sliding windows (sliding one locus at a time)
+        if int_counter_load_first_n_windows_lines_withe_readline == int_window_size
             vec_str_input[1:(end-1)] = vec_str_input[2:end]
             vec_str_input[end] = readline(FILE) ### read the next line of the file (iterates per line as long as "close(FILE)" has not been executed)
         else
-            ### Fill "vec_str_input" so we have "n_int_window_size" loci
-            while n_int_counter_load_first_n_windows_lines_withe_readline < n_int_window_size
+            ### Fill "vec_str_input" so we have "int_window_size" loci
+            while int_counter_load_first_n_windows_lines_withe_readline < int_window_size
                 push!(vec_str_input, readline(FILE))
-                n_int_counter_load_first_n_windows_lines_withe_readline += 1
+                int_counter_load_first_n_windows_lines_withe_readline += 1
             end
         end
-        ### Parse each window (contained in "vec_str_input") to extract the chromosome or scaffold names, positions, and the matrix of allele counts with "(n_int_window_size*vec_allele_names) x n_int_pool_count" dimensions
+        ### Parse each window (contained in "vec_str_input") to extract the chromosome or scaffold names, positions, and the matrix of allele counts with "(int_window_size*vec_allele_names) x int_pool_count" dimensions
         vec_str_name_of_chromosome_or_scaffold, vec_int_position, mat_int_window_counts = fun_ascii_allele_states_to_counts_per_window(vec_str_input, vec_allele_names)
         n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
         ### If we have missing loci then impute, else just add the allele counts without missing information
@@ -432,10 +431,12 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
             vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts,
                                                               vec_str_name_of_chromosome_or_scaffold,
                                                               vec_int_position,
-                                                              n_flt_maximum_fraction_of_pools_with_missing,
-                                                              n_flt_maximum_fraction_of_loci_with_missing,
-                                                              bool_OLS_dist=bool_OLS_dist)
-            ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "n_flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "n_flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
+                                                              flt_maximum_fraction_of_pools_with_missing,
+                                                              flt_maximum_fraction_of_loci_with_missing,
+                                                              bool_use_distance_matrix=bool_use_distance_matrix,
+                                                              str_model=str_model,
+                                                              flt_glmnet_alpha=flt_glmnet_alpha)
+            ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
             if !ismissing(mat_imputed)
                 mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_with_missing_loci] = mat_imputed
             end
@@ -455,23 +456,23 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                                                   [x ∈ vec_int_POSITION for x in vec_int_position]
                 vec_bool_idx_loci_new_loci_to_add = .!vec_bool_idx_loci_existing_loci
                 ### Do we have more than 1 new loci (happens if we skip loci due to the inability to impute because of too many missing data)
-                n_int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
+                int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
                 ### If we have imputed allele counts, then use the average of the imputed allele counts
                 if mat_imputed != "No imputation needed since no loci were missing."
-                    if n_int_new_loci_count < n_int_window_size
+                    if int_new_loci_count < int_window_size
                         ### Compute the average imputed allele counts by updating the average given new imputed allele counts
-                        vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(n_int_allele_count*n_int_new_loci_count))]
-                        mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(n_int_allele_count*(n_int_window_size-n_int_new_loci_count))+1):end, :]
-                        mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(n_int_allele_count*n_int_new_loci_count)), :]
-                        mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_loci, (n_int_allele_count, n_int_window_size-n_int_new_loci_count))'
-                        vec_int_imputed_loci_counter = ones(Int, n_int_window_size-n_int_new_loci_count)
+                        vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(int_allele_count*int_new_loci_count))]
+                        mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :]
+                        mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(int_allele_count*int_new_loci_count)), :]
+                        mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_loci, (int_allele_count, int_window_size-int_new_loci_count))'
+                        vec_int_imputed_loci_counter = ones(Int, int_window_size-int_new_loci_count)
                         vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
-                        vec_n = repeat(vec_int_imputed_loci_counter[vec_bool_index_for_vec_int_imputed_loci_counter], inner=n_int_allele_count)
+                        vec_n = repeat(vec_int_imputed_loci_counter[vec_bool_index_for_vec_int_imputed_loci_counter], inner=int_allele_count)
                         A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_loci, :]
                         B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_loci, :]
                         C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
                         ### Update allele counts with the average
-                        mat_int_ALLELE_COUNTS[(end-(n_int_allele_count*(n_int_window_size-n_int_new_loci_count))+1):end, :][vec_idx_bool_loci_missing_less_new_loci, :] = C
+                        mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :][vec_idx_bool_loci_missing_less_new_loci, :] = C
                         ### Update the counter which we use to compute the updated average allele count
                         vec_int_imputed_loci_counter = vec_int_imputed_loci_counter .+ vec_bool_index_for_vec_int_imputed_loci_counter
                         vec_int_imputed_loci_counter[1:(end-1)] = vec_int_imputed_loci_counter[2:(end-0)]
@@ -479,35 +480,35 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                     end
                 end
                 ### Save the file per window because it's nice to have the output written into disk rather than memory in case anything unsavory happens prior to finishing the entire job - then at least we'll have a partial output rather than nothing at all
-                if (n_int_start_locus >= 2)
+                if (int_start_locus >= 2)
                     ### Save a locus once we're done with the trailing end of the previous window
                     if n_bool_skip_leading_window == false
                         ### save leading window
                         fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
                                         vec_int_POSITION[1],
-                                        mat_int_ALLELE_COUNTS[1:n_int_allele_count, :],
-                                        n_int_allele_count,
+                                        mat_int_ALLELE_COUNTS[1:int_allele_count, :],
+                                        int_allele_count,
                                         str_filename_output)
                     else
                         ### do not save the leading window
-                        if n_int_start_locus > (n_int_window_size+1)
+                        if int_start_locus > (int_window_size+1)
                             fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1],
                                         vec_int_POSITION[1],
-                                        mat_int_ALLELE_COUNTS[1:n_int_allele_count, :],
-                                        n_int_allele_count,
+                                        mat_int_ALLELE_COUNTS[1:int_allele_count, :],
+                                        int_allele_count,
                                         str_filename_output)
                         end
                     end
                 end
                 ### Update the matrix of allele counts, and vectors of loci coordinates with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
-                if n_int_new_loci_count < n_int_window_size
+                if int_new_loci_count < int_window_size
                     ### If the new and old windows overlap as expected with sliding windows, then update the "mat_int_window_counts" according to the extent of the overlap
-                    mat_int_ALLELE_COUNTS[1:(end-(n_int_allele_count*n_int_new_loci_count)), :] = mat_int_ALLELE_COUNTS[((n_int_allele_count*n_int_new_loci_count)+1):end, :]
-                    mat_int_ALLELE_COUNTS[((end-(n_int_allele_count*n_int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=n_int_allele_count), :]
-                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-n_int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(n_int_new_loci_count+1):end]
-                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[((end-n_int_new_loci_count)+1):end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add]
-                    vec_int_POSITION[1:(end-n_int_new_loci_count)] = vec_int_POSITION[(n_int_new_loci_count+1):end]
-                    vec_int_POSITION[((end-n_int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
+                    mat_int_ALLELE_COUNTS[1:(end-(int_allele_count*int_new_loci_count)), :] = mat_int_ALLELE_COUNTS[((int_allele_count*int_new_loci_count)+1):end, :]
+                    mat_int_ALLELE_COUNTS[((end-(int_allele_count*int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=int_allele_count), :]
+                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(int_new_loci_count+1):end]
+                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[((end-int_new_loci_count)+1):end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add]
+                    vec_int_POSITION[1:(end-int_new_loci_count)] = vec_int_POSITION[(int_new_loci_count+1):end]
+                    vec_int_POSITION[((end-int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
                 else
                     ### If the old and new windows do not overlap, i.e. when "mat_int_window_counts" loci were skipped because of too much missing data which rendered imputation impossible,
                     ### then replace the matrix of allele counts, and vectors of loci coordinates with the new loci
@@ -516,14 +517,14 @@ function fun_single_threaded_imputation(str_filename_input; n_int_window_size=10
                     vec_int_POSITION[1:end] = vec_int_position
                 end
                 ### If we reach the end of the file offset by one window then save the last window
-                if n_int_start_locus == ((n_int_total_loci-n_int_window_size) + 1)
+                if int_start_locus == ((int_total_loci-int_window_size) + 1)
                     ### save trailing window
                     if n_bool_skip_trailing_window == false
                         for i in 1:length(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD)
                             fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[i],
                                             vec_int_POSITION[i],
-                                            mat_int_ALLELE_COUNTS[(((i-1)*n_int_allele_count)+1):(i*n_int_allele_count), :],
-                                            n_int_allele_count,
+                                            mat_int_ALLELE_COUNTS[(((i-1)*int_allele_count)+1):(i*int_allele_count), :],
+                                            int_allele_count,
                                             str_filename_output)
                         end
                     end
@@ -570,19 +571,19 @@ function fun_filter_pileup(str_filename_input; flt_maximum_missing=0.50, str_fil
 end
 
 ### simulate missing loci, output a pileup file with missing data, and return the total number of loci
-function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100, n_flt_maximum_fraction_of_loci_with_missing=0.50, n_flt_maximum_fraction_of_pools_with_missing=0.25, str_filename_pileup_simulated_missing=".")
+function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100, flt_maximum_fraction_of_loci_with_missing=0.50, flt_maximum_fraction_of_pools_with_missing=0.25, str_filename_pileup_simulated_missing=".")
     ###########################################################
     ### TEST
     # str_filename_pileup = "/data-weedomics-1/test_human.pileup"
     # n_sequencing_read_length = 150
-    # n_flt_maximum_fraction_of_loci_with_missing = 0.50
-    # n_flt_maximum_fraction_of_pools_with_missing = 0.25
+    # flt_maximum_fraction_of_loci_with_missing = 0.50
+    # flt_maximum_fraction_of_pools_with_missing = 0.25
     ###########################################################
     if str_filename_pileup_simulated_missing=="."
         str_filename_pileup_simulated_missing = string(join(split(str_filename_pileup, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
     end
     println("Counting lines.")
-    @show n_int_loci_count = countlines(str_filename_pileup)
+    @show int_loci_count = countlines(str_filename_pileup)
     println("Counting pools.")
     file_temp = open(str_filename_pileup, "r")
     i = -1
@@ -591,16 +592,16 @@ function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100,
         line = readline(file_temp)
     end
     close(file_temp)
-    @show n_int_pool_count = Int((length(split(line, '\t')) - 3) / 3)
+    @show int_pool_count = Int((length(split(line, '\t')) - 3) / 3)
     println("Randomly sampling loci chunks to set to missing.")
-    n_int_chunk_count = Int(ceil(n_int_loci_count / n_sequencing_read_length))
+    int_chunk_count = Int(ceil(int_loci_count / n_sequencing_read_length))
     println("Counting the number of loci and pool which will be set to missing.")
-    @show n_int_missing_loci_count = Int(round(n_int_chunk_count*n_flt_maximum_fraction_of_loci_with_missing))
-    @show n_int_missing_pool_count = Int(round(n_int_pool_count*n_flt_maximum_fraction_of_pools_with_missing))
+    @show int_missing_loci_count = Int(round(int_chunk_count*flt_maximum_fraction_of_loci_with_missing))
+    @show int_missing_pool_count = Int(round(int_pool_count*flt_maximum_fraction_of_pools_with_missing))
     ### Proceed if we will be simulating at least 1 missing datapoint
-    if n_int_missing_loci_count*n_int_missing_pool_count > 0
+    if int_missing_loci_count*int_missing_pool_count > 0
         println("Randomly sample chunks of loci which will be set to missing.")
-        vec_int_random_chunk = sort(randperm(n_int_chunk_count)[1:n_int_missing_loci_count])
+        vec_int_random_chunk = sort(randperm(int_chunk_count)[1:int_missing_loci_count])
         vec_int_random_chunk = ((vec_int_random_chunk .- 1) .* n_sequencing_read_length) .+ 1
         println("Open input and output files, and initialise the interators")
         FILE = open(str_filename_pileup, "r")
@@ -608,7 +609,7 @@ function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100,
         i = 0
         j = 1
         println("Simulate missing data.")
-        pb = ProgressMeter.Progress(n_int_loci_count, i)
+        pb = ProgressMeter.Progress(int_loci_count, i)
         while !eof(FILE)
             i += 1; ProgressMeter.next!(pb)
             line = readline(FILE)
@@ -621,11 +622,11 @@ function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100,
                 ### extract the scaffold or chromosome name
                 str_scaffold_or_chromosome = vec_str_line[1]
                 ### randomly choose pools to get missing data
-                vec_idx_pool_rand_missing = randperm(n_int_pool_count)[1:n_int_missing_pool_count]
+                vec_idx_pool_rand_missing = randperm(int_pool_count)[1:int_missing_pool_count]
                 vec_idx_pool_rand_missing = (((vec_idx_pool_rand_missing .- 1) .* 3) .+ 1) .+ 3
-                n_int_position_ini = parse(Int, vec_str_line[2])
-                n_int_position_end = n_int_position_ini + (n_sequencing_read_length - 1) ### less initial position twice since we're counting the initial position as part of the read length and we've already written it before the forst iteration of the while-loop
-                while (str_scaffold_or_chromosome == vec_str_line[1]) & (parse(Int, vec_str_line[2]) <= n_int_position_end) & !eof(FILE)
+                int_position_ini = parse(Int, vec_str_line[2])
+                int_position_end = int_position_ini + (n_sequencing_read_length - 1) ### less initial position twice since we're counting the initial position as part of the read length and we've already written it before the forst iteration of the while-loop
+                while (str_scaffold_or_chromosome == vec_str_line[1]) & (parse(Int, vec_str_line[2]) <= int_position_end) & !eof(FILE)
                     ### Set to missing each of the randomly sampled pools in the current locus
                     for k in vec_idx_pool_rand_missing
                         vec_str_line[k:k+2] = ["0", "*", "*"]
@@ -688,8 +689,8 @@ function fun_filter_output_syncx(str_filename_output; vec_str_missing_loci, str_
     i = 1
     vec_str_imputed_loci = []
     println("Counting the number of imputed loci.")
-    n_int_lines_count = countlines(str_filename_output)
-    pb = ProgressMeter.Progress(n_int_lines_count, i)
+    int_lines_count = countlines(str_filename_output)
+    pb = ProgressMeter.Progress(int_lines_count, i)
     println("Filtering imputation output (syncx file) to include only the imputed loci.")
     while !eof(file_imputed)
         ### imputed file loci ID
@@ -739,9 +740,9 @@ function fun_filter_original_pileup(str_filename_pilelup_no_missing_loci; vec_st
     file_imputed = open(str_filename_pileup_filtered_imputed_loci, "w")
     i = 1
     println("Counting the number of loci.")
-    n_int_loci_count = countlines(str_filename_pilelup_no_missing_loci)
+    int_loci_count = countlines(str_filename_pilelup_no_missing_loci)
     println("Filtering the pileup file to include only the loci which were simulated to be missing and successfully imputed.")
-    pb = ProgressMeter.Progress(n_int_loci_count, i)
+    pb = ProgressMeter.Progress(int_loci_count, i)
     while !eof(file_orig)
         line = readline(file_orig)
         ProgressMeter.next!(pb)

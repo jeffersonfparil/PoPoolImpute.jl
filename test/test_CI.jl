@@ -4,8 +4,8 @@ using ProgressMeter
 using UnicodePlots
 using Random
 using Distributed
-n_int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
-Distributed.addprocs(n_int_thread_count)
+int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
+Distributed.addprocs(int_thread_count)
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
 
@@ -23,7 +23,7 @@ cd("test/")
 ###     (2) impute
 ###     (3) load imputation output, and
 ###     (4) check imputation accuracy
-function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_OLS_dist=false, n_int_number_of_iterations=1, n_int_thread_count=2)
+function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_prefix="out", int_number_of_iterations=1, int_thread_count=2)
     # ############################
     # ### TEST
     # input="test.pileup.tar.xz"
@@ -31,9 +31,9 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     # P_missing_pools=0.5
     # P_missing_loci=0.5
     # n_sequencing_read_length=10
-    # bool_OLS_dist=false
-    # n_int_number_of_iterations=1
-    # n_int_thread_count=2
+    # bool_use_distance_matrix=false
+    # int_number_of_iterations=1
+    # int_thread_count=2
     # ############################
     if input == "test.pileup.tar.xz"
         ### Uncompress test pileup file
@@ -49,26 +49,28 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     t = 0 ### iteration counter
     q = 0 ### error counter
     q_max = 10 ### maximum number of error
-    while (t < n_int_number_of_iterations) & ( q <= q_max)
+    while (t < int_number_of_iterations) & ( q <= q_max)
         ### Set pseudo-randomisation seed
         Random.seed!(t+q)
         ### Simulate 10% missing loci in 10% of the pools
         str_filename_withMissing = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
         PoPoolImpute.functions.fun_simulate_missing(str_filename_pilelup_no_missing_loci,
                              n_sequencing_read_length=n_sequencing_read_length,
-                             n_flt_maximum_fraction_of_loci_with_missing=P_missing_loci,
-                             n_flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
+                             flt_maximum_fraction_of_loci_with_missing=P_missing_loci,
+                             flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
                              str_filename_pileup_simulated_missing=str_filename_withMissing)
         ### Impute (catch errors when the input file is too sparse, and re-run simulation of missing data)
-        str_filename_output = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
+        str_filename_output = string(str_output_prefix, "-", join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
         try
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
-                                           n_int_window_size=window_size,
-                                           n_flt_maximum_fraction_of_pools_with_missing=0.9,
-                                           n_flt_maximum_fraction_of_loci_with_missing=0.9,
+                                           int_window_size=window_size,
+                                           flt_maximum_fraction_of_pools_with_missing=0.9,
+                                           flt_maximum_fraction_of_loci_with_missing=0.9,
                                            str_filename_output=str_filename_output,
-                                           bool_OLS_dist=bool_OLS_dist,
-                                           n_int_thread_count=n_int_thread_count)==0
+                                           bool_use_distance_matrix=bool_use_distance_matrix,
+                                           str_model=str_model,
+                                           flt_glmnet_alpha=flt_glmnet_alpha,
+                                           int_thread_count=int_thread_count)==0
         catch
             @show "At least one of the chunks has too many missing data!"
             ### Clean-up defective chunk/s and the pileup with simulated missing data
@@ -109,14 +111,14 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         mat_int_ALLELE_COUNTS = parse.(Float64, X[3:end,:])'
 
         println("Calculate allele frequencies, and total depth")
-        n_int_pool_count = size(mat_int_ALLELE_COUNTS, 2)
+        int_pool_count = size(mat_int_ALLELE_COUNTS, 2)
         mat_flt_ALLELE_FREQS = copy(mat_int_ALLELE_COUNTS)
         mat_int_DEPTHS = Int.(copy(mat_int_ALLELE_COUNTS))
         for i in collect(1:7:size(mat_flt_ALLELE_FREQS,1))
             mat_flt_ALLELE_FREQS[i:(i+6),:] = mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1)
             mat_int_DEPTHS[i:(i+6),:] = repeat(sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1), 7)
             if sum(isnan.(mat_int_ALLELE_COUNTS[i:(i+6),:] ./ sum(mat_int_ALLELE_COUNTS[i:(i+6),:], dims=1))) > 0
-                mat_flt_ALLELE_FREQS[i:(i+6),:] = zeros(7, n_int_pool_count) ### 0 / 0 is zero
+                mat_flt_ALLELE_FREQS[i:(i+6),:] = zeros(7, int_pool_count) ### 0 / 0 is zero
             end
         end
         mat_flt_ALLELE_FREQS_NO_MISSING = copy(mat_int_ALLELE_COUNTS_NO_MISSING)
@@ -126,7 +128,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
 
 
         println("Fraction of missing data that were successfully imputed.")
-        @show n_flt_fraction_missing_imputed = length(vec_str_scaf_WITHOUT_MISSING) / length(vec_str_missing_loci)
+        @show flt_fraction_missing_imputed = length(vec_str_scaf_WITHOUT_MISSING) / length(vec_str_missing_loci)
         println("Remove zero rows (zero frequency alleles.")
         vec_bool_idx_no_freq_alleles = (sum(mat_int_ALLELE_COUNTS_NO_MISSING, dims=2) .== 0)[:,1]
         mat_int_ALLELE_COUNTS_NO_MISSING = mat_int_ALLELE_COUNTS_NO_MISSING[.!vec_bool_idx_no_freq_alleles, :]
@@ -163,7 +165,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                 end
             end
         end
-        if n_int_number_of_iterations == 1
+        if int_number_of_iterations == 1
             println("Scatter plot.")
             plot1 = UnicodePlots.scatterplot(Float64.(vec_int_counts_true),
                                            Float64.(vec_int_counts_imputed),
@@ -187,7 +189,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                                     string(P_missing_pools),
                                     string(P_missing_loci),
                                     string(n_sequencing_read_length),
-                                    string(round(n_flt_fraction_missing_imputed, digits=4)),
+                                    string(round(flt_fraction_missing_imputed, digits=4)),
                                     string(vec_int_depths[i]),
                                     string(vec_int_counts_true[i]),
                                     string(vec_int_counts_imputed[i]),
@@ -198,11 +200,11 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         end
         close(FILE_OUTPUT)
         println("Calculate imputation accuracy.")
-        @show n_flt_RMSE_counts = sqrt(sum((vec_int_counts_true .- vec_int_counts_imputed).^2)/prod(size(vec_int_counts_true)))
-        @show n_flt_Rflt_freqs = sqrt(sum((vec_flt_freqs_true .- vec_flt_freqs_imputed).^2)/prod(size(vec_flt_freqs_true)))
+        @show flt_RMSE_counts = sqrt(sum((vec_int_counts_true .- vec_int_counts_imputed).^2)/prod(size(vec_int_counts_true)))
+        @show flt_Rflt_freqs = sqrt(sum((vec_flt_freqs_true .- vec_flt_freqs_imputed).^2)/prod(size(vec_flt_freqs_true)))
         ### Append fraction of imputed missing data, and RMSE into the the output vectors
-        append!(vec_flt_fraction_missing_imputed, n_flt_fraction_missing_imputed)
-        append!(vec_flt_RMSE, n_flt_RMSE_counts)
+        append!(vec_flt_fraction_missing_imputed, flt_fraction_missing_imputed)
+        append!(vec_flt_RMSE, flt_RMSE_counts)
         ### Clean-up
         rm(str_filename_withMissing)
         rm(str_filename_output)
@@ -210,7 +212,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         rm(str_filename_pileup_filtered_imputed_loci)
     end
     ### View statistics
-    if (n_int_number_of_iterations > 1) & (length(vec_flt_fraction_missing_imputed)>1)
+    if (int_number_of_iterations > 1) & (length(vec_flt_fraction_missing_imputed)>1)
         @show sum(vec_flt_fraction_missing_imputed)/length(vec_flt_fraction_missing_imputed)
         @show sum(vec_flt_RMSE)/length(vec_flt_RMSE)
         @show UnicodePlots.histogram(Number.(vec_flt_fraction_missing_imputed))
@@ -224,6 +226,17 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     return(0)
 end
 
+### Test on all combinations of the model building methods
+for bool_use_distance_matrix in [true, false]
+    for str_model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
+        println("###########################################")
+        println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+        println("###########################################")
+        println(string("bool_use_distance_matrix=", bool_use_distance_matrix, "; str_model=", str_model))
+        fun_sim_impute_check(bool_use_distance_matrix=bool_use_distance_matrix, str_model=str_model)
+    end
+end
+
 # ### MISC: USING OTHER DATASETS
 # ### Accuracy assessment
 # using Test
@@ -232,30 +245,35 @@ end
 # using UnicodePlots
 # using Random
 # using Distributed
-# n_int_thread_count = 30
-# Distributed.addprocs(n_int_thread_count)
+# int_thread_count = 30
+# Distributed.addprocs(int_thread_count)
 # Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 # @everywhere using PoPoolImpute
 # ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
-# ### Precompile with 1 iteration
-# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
-#                            window_size=200,
-#                            P_missing_pools=0.5,
-#                            P_missing_loci=0.5,
-#                            n_sequencing_read_length=100,
-#                            bool_OLS_dist=true,
-#                            n_int_thread_count=30,
-#                            n_int_number_of_iterations=1)
-# ### Clean-up
-# cd("/data-weedomics-1/ctDNA/")
-# rm.(readdir()[match.(Regex("ACCURACY.csv"), readdir()) .!= nothing])
-# cd("/data-weedomics-1/")
-# ### Main run
-# @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
-#                            window_size=200,
-#                            P_missing_pools=0.5,
-#                            P_missing_loci=0.5,
-#                            n_sequencing_read_length=100,
-#                            bool_OLS_dist=true,
-#                            n_int_thread_count=30,
-#                            n_int_number_of_iterations=100)
+
+# int_reps = 10
+# vec_str_dist_model = []
+# for str_dist in ["false", "true"]
+#     for str_mod in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
+#         push!(vec_str_dist_model, string(str_dist, "-", str_mod))
+#     end
+# end
+
+# vec_str_dist_model = repeat(vec_str_dist_model, int_reps)
+# vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
+# for i in 1:length(vec_str_dist_model)
+#     # i = 1
+#     vec_str_dist_mod = split(vec_str_dist_model[i], "-")
+#     bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
+#     str_model = vec_str_dist_mod[2]
+#     @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+#                             window_size=200,
+#                             P_missing_pools=0.5,
+#                             P_missing_loci=0.5,
+#                             n_sequencing_read_length=100,
+#                             bool_use_distance_matrix=bool_use_distance_matrix,
+#                             str_model=str_model,
+#                             int_thread_count=30,
+#                             str_output_prefix=vec_str_dist_model[i],
+#                             int_number_of_iterations=1)
+# end
