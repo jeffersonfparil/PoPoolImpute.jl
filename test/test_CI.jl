@@ -13,7 +13,7 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 cd("test/")
 
 ################################
-## TEST LOCALLY: comment-out lines 9 and 10 first
+### TEST LOCALLY: comment-out lines 9 and 10 first
 # @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 # cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
 ################################
@@ -277,6 +277,6 @@ end
 #                             str_model=str_model,
 #                             int_thread_count=30,
 #                             str_output_suffix=vec_str_dist_model[i],
-#                             in_seed=sum(Int.(codeunits(vec_str_dist_model[i]))),
+#                             int_seed=sum(Int.(codeunits(vec_str_dist_model[i]))),
 #                             int_number_of_iterations=1)
 # end
