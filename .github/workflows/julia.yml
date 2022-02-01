@@ -38,5 +38,5 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt-get install -y tar; julia -e 'import Pkg; Pkg.add("LinearAlgebra"); Pkg.add("UnicodePlots"); Pkg.add("Distributed"); Pkg.add("ProgressMeter")'
-      - name:  Test 1 iteration and plot
+      - name: Tests
         run: julia -e 'include("test/test_CI.jl")'
