@@ -29,7 +29,7 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 4. flt\\_maximum\\_fraction\\_of\\_loci\\_with\\_missing [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
 5. bool\\_use\\_distance\\_matrix [Boolean; default=false]: perform ordinary least squares regression with pairwise loci distances covariate
 6. str\\_model [String; default="OLS"]: imputation model to use. Choose from "Mean" (average counts in the non-missing pools), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator), and "GLMNET" (elastic net with additional parameter flt_glmnet_alpha; default=0.5)
-7. int\\_thread\\_count [Integer; default=1]: number of computing threads to use
+7. int\\_thread\\_count [Integer; default=2]: number of computing threads to use
 
 
 # Output

@@ -18,7 +18,7 @@ PopPoolImpute.impute(str_filename_input; int_window_size=10, flt_maximum_fractio
 5. *bool_use_distance_matrix* [Boolean; default=false]: perform ordinary least squares regression with pairwise loci distances covariate
 6. *str_model* [String; default="OLS"]: imputation model to use. Choose from "Mean" (average counts in the non-missing pools), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator), and "GLMNET" (elastic net with additional parameter flt_glmnet_alpha; default=0.5)
 
-7. *n_int_thread_count* [Integer; default=1]: number of computing threads to use
+7. *n_int_thread_count* [Integer; default=2]: number of computing threads to use
 
 # Output
 *str_filename_output* [String; default="output-imputed.syncx"; comma-separated file]
