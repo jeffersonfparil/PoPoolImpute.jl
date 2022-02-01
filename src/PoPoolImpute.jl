@@ -19,7 +19,7 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 
 
 # Usage
-`PopPoolImpute.impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, int_thread_count=1)`
+`PopPoolImpute.impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, int_thread_count=2)`
 
 
 # Inputs
