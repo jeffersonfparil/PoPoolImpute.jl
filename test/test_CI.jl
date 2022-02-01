@@ -13,7 +13,7 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 cd("test/")
 
 ################################
-### TEST LOCALLY: comment-out lines 9 and 10 first
+## TEST LOCALLY: comment-out lines 9 and 10 first
 # @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 # cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
 ################################
@@ -23,7 +23,7 @@ cd("test/")
 ###     (2) impute
 ###     (3) load imputation output, and
 ###     (4) check imputation accuracy
-function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_prefix="out", int_number_of_iterations=1, int_thread_count=2)
+function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_suffix="out", int_seed=0, int_number_of_iterations=1, int_thread_count=2)
     # ############################
     # ### TEST
     # input="test.pileup.tar.xz"
@@ -51,7 +51,11 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     q_max = 10 ### maximum number of error
     while (t < int_number_of_iterations) & ( q <= q_max)
         ### Set pseudo-randomisation seed
-        Random.seed!(t+q)
+        if int_seed == 0
+            Random.seed!(t+q)
+        else
+            Random.seed!(int_seed)
+        end
         ### Simulate 10% missing loci in 10% of the pools
         str_filename_withMissing = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
         PoPoolImpute.functions.fun_simulate_missing(str_filename_pilelup_no_missing_loci,
@@ -60,7 +64,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
                              flt_maximum_fraction_of_pools_with_missing=P_missing_pools,
                              str_filename_pileup_simulated_missing=str_filename_withMissing)
         ### Impute (catch errors when the input file is too sparse, and re-run simulation of missing data)
-        str_filename_output = string(dirname(str_filename_pilelup_no_missing_loci), "/", str_output_prefix, "-", join(split(basename(str_filename_pilelup_no_missing_loci), '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
+        str_filename_output = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-IMPUTED-", time(), ".syncx")
         try
             Test.@test PoPoolImpute.impute(str_filename_withMissing, 
                                            int_window_size=window_size,
@@ -179,7 +183,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
             @show plot2
         end
         println("Save true and predicted counts and frequencies")
-        str_filename_output_csv = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-ACCURACY.csv")
+        str_filename_output_csv = string(join(split(str_filename_output, '.')[1:(end-1)], '.'), "-ACCURACY-", str_output_suffix, ".csv")
         FILE_OUTPUT = open(str_filename_output_csv, "w")
         str_header = "Iteration,Window_size,P_missing_pools,P_missing_loci,Read_length,P_missing_imputed,Depth,True_counts,Imputed_counts,True_freqs,Imputed_freqs\n"
         write(FILE_OUTPUT, str_header)
@@ -237,44 +241,42 @@ for bool_use_distance_matrix in [false, true]
     end
 end
 
-### MISC: USING OTHER DATASETS
-### Accuracy assessment
-using Test
-using Pkg
-using ProgressMeter
-using UnicodePlots
-using Random
-using Distributed
-int_thread_count = 30
-Distributed.addprocs(int_thread_count)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
-
-### NOTE!!!!! Manually load fun_sim_impute_check() from above.
-
-int_reps = 10
-vec_str_dist_model = []
-for str_dist in ["false", "true"]
-    for str_mod in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
-        push!(vec_str_dist_model, string(str_dist, "-", str_mod))
-    end
-end
-
-vec_str_dist_model = repeat(vec_str_dist_model, int_reps)
-vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
-@time for i in 1:length(vec_str_dist_model)
-    # i = 1
-    vec_str_dist_mod = split(vec_str_dist_model[i], "-")
-    bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
-    str_model = vec_str_dist_mod[2]
-    @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
-                            window_size=200,
-                            P_missing_pools=0.5,
-                            P_missing_loci=0.5,
-                            n_sequencing_read_length=100,
-                            bool_use_distance_matrix=bool_use_distance_matrix,
-                            str_model=str_model,
-                            int_thread_count=30,
-                            str_output_prefix=vec_str_dist_model[i],
-                            int_number_of_iterations=1)
-end
+# ### MISC: USING OTHER DATASETS
+# ### Accuracy assessment
+# using Test
+# using Pkg
+# using ProgressMeter
+# using UnicodePlots
+# using Random
+# using Distributed
+# int_thread_count = 30
+# Distributed.addprocs(int_thread_count)
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
+# ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
+# vec_str_dist_model = []
+# for str_dist in ["false", "true"]
+#     for str_mod in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
+#         for int_rep in 1:10
+#             push!(vec_str_dist_model, string(str_dist, "-", str_mod, "-", int_rep))
+#         end
+#     end
+# end
+# vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
+# @time for i in 1:length(vec_str_dist_model)
+#     # i = 1
+#     vec_str_dist_mod = split(vec_str_dist_model[i], "-")
+#     bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
+#     str_model = vec_str_dist_mod[2]
+#     @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+#                             window_size=200,
+#                             P_missing_pools=0.5,
+#                             P_missing_loci=0.5,
+#                             n_sequencing_read_length=100,
+#                             bool_use_distance_matrix=bool_use_distance_matrix,
+#                             str_model=str_model,
+#                             int_thread_count=30,
+#                             str_output_suffix=vec_str_dist_model[i],
+#                             in_seed=sum(Int.(codeunits(vec_str_dist_model[i]))),
+#                             int_number_of_iterations=1)
+# end
