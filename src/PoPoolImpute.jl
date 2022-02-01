@@ -19,7 +19,7 @@ using .functions: fun_ascii_allele_states_to_counts_per_locus,
 
 
 # Usage
-`PopPoolImpute.impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_OLS_dist=false, n_int_thread_count=1)`
+`PopPoolImpute.impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, int_thread_count=1)`
 
 
 # Inputs
@@ -49,10 +49,10 @@ PoPoolImpute.impute(str_filename_input)
 
 # Multi-threaded execution
 using Distributed
-n_int_thread_count = length(Sys.cpu_info())-1
-Distributed.addprocs(n_int_thread_count)
+int_thread_count = length(Sys.cpu_info())-1
+Distributed.addprocs(int_thread_count)
 @everywhere using PoPoolImpute
-PoPoolImpute.impute(str_filename_input, str_filename_output="multithreaded.syncx", n_int_thread_count=n_int_thread_count)
+PoPoolImpute.impute(str_filename_input, str_filename_output="multithreaded.syncx", int_thread_count=int_thread_count)
 ```
 
 
@@ -85,16 +85,16 @@ The imputed allele counts are averaged across the windows sliding one locus at a
 ...
 
 """
-function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction_of_pools_with_missing=0.5, n_flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_OLS_dist=false, n_int_thread_count=2)
+function impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, int_thread_count=2)
     ###################################################################
     ### TEST
     # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
     # str_filename_input = "out_simissing.pileup"
-    # n_int_window_size = 10
-    # n_flt_maximum_fraction_of_pools_with_missing = 0.5
-    # n_flt_maximum_fraction_of_loci_with_missing = 0.5
+    # int_window_size = 10
+    # flt_maximum_fraction_of_pools_with_missing = 0.5
+    # flt_maximum_fraction_of_loci_with_missing = 0.5
     # str_filename_output = "output-imputed.syncx"
-    # n_int_thread_count = 3
+    # int_thread_count = 3
     ###################################################################
     ### Opening remark
     println("")
@@ -104,11 +104,16 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     println("####################################################################")
     println("Input parameters:")
     @show str_filename_input
-    @show n_int_window_size
-    @show n_flt_maximum_fraction_of_pools_with_missing
-    @show n_flt_maximum_fraction_of_loci_with_missing
+    @show int_window_size
+    @show flt_maximum_fraction_of_pools_with_missing
+    @show flt_maximum_fraction_of_loci_with_missing
     @show str_filename_output
-    @show n_int_thread_count
+    @show bool_use_distance_matrix
+    @show str_model
+    if str_model == "GLMNET"
+        @show flt_glmnet_alpha
+    end
+    @show int_thread_count
     println("####################################################################")
     println(string("Time: ", Dates.format(now(), "Y-u-dd(E)THH:MM")))
     println("####################################################################")
@@ -121,59 +126,63 @@ function impute(str_filename_input; n_int_window_size=10, n_flt_maximum_fraction
     end
     ### Count the number of loci
     println("Counting the total number of loci in the input pileup file.")
-    @show n_int_total_loci = countlines(str_filename_input)
+    @show int_total_loci = countlines(str_filename_input)
     ### Define the size of each chunk to cut up the input file
-    n_int_chunk_count = n_int_thread_count
-    n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_chunk_count))
-    ### Rectify chunk size if it is less than twice the n_int_window_size
-    if n_int_chuck_size < 2*n_int_window_size
-        n_int_chunk_count = Int(floor(n_int_total_loci / (2*n_int_window_size)))
-        n_int_chuck_size = Int(ceil(n_int_total_loci / n_int_chunk_count))
+    int_chunk_count = int_thread_count
+    int_chuck_size = Int(ceil(int_total_loci / int_chunk_count))
+    ### Rectify chunk size if it is less than twice the int_window_size
+    if int_chuck_size < 2*int_window_size
+        int_chunk_count = Int(floor(int_total_loci / (2*int_window_size)))
+        int_chuck_size = Int(ceil(int_total_loci / int_chunk_count))
     end
-    ### Split the input pileup file if we can afford parallel processing, i.e. (n_int_thread_count > 1) since (n_int_thread_count = n_int_chunk_count)
-    if n_int_chunk_count > 1
+    ### Split the input pileup file if we can afford parallel processing, i.e. (int_thread_count > 1) since (int_thread_count = int_chunk_count)
+    if int_chunk_count > 1
         fun_split_pileup(str_filename_input,
-                         n_int_chunk_count=n_int_chunk_count,
-                         n_int_chuck_size=n_int_chuck_size,
-                         n_int_window_size=n_int_window_size,
+                         int_chunk_count=int_chunk_count,
+                         int_chuck_size=int_chuck_size,
+                         int_window_size=int_window_size,
                          n_bool_add_leading_trailing_windows=true)
     end
     println("Imputing.")
-    @show n_int_thread_count
-    if n_int_thread_count > 1
+    @show int_thread_count
+    if int_thread_count > 1
         ### Parallel for-loop for each chunk of the split input file
         println("Multi-threaded imputation.")
-        @time _ = @sync @showprogress @distributed for i in 1:n_int_chunk_count
+        @time _ = @sync @showprogress @distributed for i in 1:int_chunk_count
             str_filename_chunk_input = string(str_filename_input, "-CHUNK_", i)
             str_filename_chunk_output = string(str_filename_output, "-CHUNK_", i)
             ### Trim-out the leading and/or trailing windows
             n_bool_skip_leading_window = i>1 ### first chunk does not have a leading window
-            n_bool_skip_trailing_window = i<n_int_chunk_count ### last chunk does not have trailing window
+            n_bool_skip_trailing_window = i<int_chunk_count ### last chunk does not have trailing window
             fun_single_threaded_imputation(str_filename_chunk_input,
-                n_int_window_size=n_int_window_size,
-                n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
-                n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
+                int_window_size=int_window_size,
+                flt_maximum_fraction_of_pools_with_missing=flt_maximum_fraction_of_pools_with_missing,
+                flt_maximum_fraction_of_loci_with_missing=flt_maximum_fraction_of_loci_with_missing,
                 str_filename_output=str_filename_chunk_output,
                 n_bool_skip_leading_window=n_bool_skip_leading_window,
                 n_bool_skip_trailing_window=n_bool_skip_trailing_window,
-                bool_OLS_dist=bool_OLS_dist)
+                bool_use_distance_matrix=bool_use_distance_matrix,
+                str_model=str_model,
+                flt_glmnet_alpha=flt_glmnet_alpha)
         end
     else
         ### Non-parallel imputation for unsplit input file
         println("Single-threaded imputation.")
         fun_single_threaded_imputation(str_filename_input,
-                                n_int_window_size=n_int_window_size,
-                                n_flt_maximum_fraction_of_pools_with_missing=n_flt_maximum_fraction_of_pools_with_missing,
-                                n_flt_maximum_fraction_of_loci_with_missing=n_flt_maximum_fraction_of_loci_with_missing,
+                                int_window_size=int_window_size,
+                                flt_maximum_fraction_of_pools_with_missing=flt_maximum_fraction_of_pools_with_missing,
+                                flt_maximum_fraction_of_loci_with_missing=flt_maximum_fraction_of_loci_with_missing,
                                 str_filename_output=str_filename_output,
                                 n_bool_skip_leading_window=false,
                                 n_bool_skip_trailing_window=false,
-                                bool_OLS_dist=bool_OLS_dist)
+                                bool_use_distance_matrix=bool_use_distance_matrix,
+                                str_model=str_model,
+                                flt_glmnet_alpha=flt_glmnet_alpha)
     end
     ### Concatenate chunks
-    if n_int_chunk_count > 1
+    if int_chunk_count > 1
         open(str_filename_output, "w") do FILE_OUT
-            for i in 1:n_int_chunk_count
+            for i in 1:int_chunk_count
                 str_filename_chunk = string(str_filename_output, "-CHUNK_", i)
                 ### Check if the chunk exists (the chunk file may not exist if no loci were kept)
                 if isfile(str_filename_chunk)
