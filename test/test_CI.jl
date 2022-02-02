@@ -6,16 +6,16 @@ using Random
 using Distributed
 int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
 Distributed.addprocs(int_thread_count)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
 
 ### Navigate to testing directory
 cd("test/")
 
 ################################
 ### TEST LOCALLY: comment-out lines 9 and 10 first
-# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-# cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
+@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test")
 ################################
 
 ### Main test function:
@@ -94,6 +94,14 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
               vec_str_imputed_loci = PoPoolImpute.functions.fun_filter_output_syncx(str_filename_output, vec_str_missing_loci=vec_str_missing_loci)
         ### Did we impute anything?
         if length(vec_str_imputed_loci)==0
+            @show "We did not impute anything. Re-simulating missing data."
+            ### Clean-up defective chunk/s and the pileup with simulated missing data
+            vec_str_fname_chunks = readdir()[match.(r"CHUNK", readdir()) .!= nothing]
+            rm.(vec_str_fname_chunks)
+            rm(str_filename_withMissing)
+            rm(str_filename_output)
+            rm(str_filename_syncx_missing_loci_only)
+            ### Continue with the following iteration of the while-loop
             q += 1
             continue
         else

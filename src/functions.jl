@@ -204,7 +204,13 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
                 ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
                 X\Y
             catch
-                missing
+                ### Moore-Penrose pseudoinverse if the automatic solver fails
+                try
+                    LinearAlgebra.pinv(X'*X)*(X'*Y)
+                catch
+                    ### If singular and if Z has missing values which indicate loci in different chromosomes  or scaffolds are in the same window which does not work if we are accounting for loci distances
+                    missing
+                end
             end
         elseif str_model == "RR"
             B = try
@@ -603,7 +609,7 @@ function fun_simulate_missing(str_filename_pileup; n_sequencing_read_length=100,
         println("Randomly sample chunks of loci which will be set to missing.")
         vec_int_random_chunk = sort(randperm(int_chunk_count)[1:int_missing_loci_count])
         vec_int_random_chunk = ((vec_int_random_chunk .- 1) .* n_sequencing_read_length) .+ 1
-        println("Open input and output files, and initialise the interators")
+        println("Open input and output files, and initialise the iterators")
         FILE = open(str_filename_pileup, "r")
         file_out = open(str_filename_pileup_simulated_missing, "w")
         i = 0
