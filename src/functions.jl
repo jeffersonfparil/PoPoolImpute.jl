@@ -734,7 +734,7 @@ end
 ### filter original pileup file to contain only the loci simutated to have missing data and were subsequently imputed
 function fun_filter_original_pileup(str_filename_pilelup_no_missing_loci; vec_str_imputed_loci, str_filename_pileup_filtered_imputed_loci=".")
     if str_filename_pileup_filtered_imputed_loci == "."
-        str_filename_pileup_filtered_imputed_loci = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)]), "-FILTERED_IMPUTED_LOCI_ONLY.pileup")
+        str_filename_pileup_filtered_imputed_loci = string(join(split(str_filename_pilelup_no_missing_loci, '.')[1:(end-1)], '.'), "-FILTERED_IMPUTED_LOCI_ONLY.pileup")
     end
     file_orig = open(str_filename_pilelup_no_missing_loci, "r")
     file_imputed = open(str_filename_pileup_filtered_imputed_loci, "w")

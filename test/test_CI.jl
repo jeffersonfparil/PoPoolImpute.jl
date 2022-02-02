@@ -262,6 +262,7 @@ end
 #         end
 #     end
 # end
+# Random.seed!(42)
 # vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
 # @time for i in 1:length(vec_str_dist_model)
 #     # i = 1
