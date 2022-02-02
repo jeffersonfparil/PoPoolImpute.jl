@@ -237,7 +237,10 @@ for bool_use_distance_matrix in [false, true]
         println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         println("###########################################")
         println(string("bool_use_distance_matrix=", bool_use_distance_matrix, "; str_model=", str_model))
-        fun_sim_impute_check(bool_use_distance_matrix=bool_use_distance_matrix, str_model=str_model)
+        fun_sim_impute_check(bool_use_distance_matrix=bool_use_distance_matrix,
+                             str_model=str_model,
+                             str_output_suffix=string(bool_use_distance_matrix, "-", str_model),
+                             int_seed=sum(Int.(codeunits(string(bool_use_distance_matrix, "-", str_model)))))
     end
 end
 
