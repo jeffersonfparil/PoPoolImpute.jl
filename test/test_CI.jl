@@ -23,7 +23,7 @@ cd("test/")
 ###     (2) impute
 ###     (3) load imputation output, and
 ###     (4) check imputation accuracy
-function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_suffix="out", int_seed=0, int_number_of_iterations=1, int_thread_count=2)
+function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_suffix="out", int_seed=0, int_number_of_iterations=1, int_thread_count=2, int_max_error_resimulate_missing=1)
     # ############################
     # ### TEST
     # input="test.pileup.tar.xz"
@@ -48,7 +48,7 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
     ### Using a while-try-catch expression to prevent failure when one of the chunks are too sparse due to the stochasticity of "2_simulate_missing_loci_in_pileup_file.sh"
     t = 0 ### iteration counter
     q = 0 ### error counter
-    q_max = 10 ### maximum number of error
+    q_max = int_max_error_resimulate_missing # 10 ### maximum number of error
     while (t < int_number_of_iterations) & ( q <= q_max)
         ### Set pseudo-randomisation seed
         if int_seed == 0
@@ -273,14 +273,17 @@ end
 #         end
 #     end
 # end
-# Random.seed!(42)
+# Random.seed!(sum(Int.(codeunits("Nice"))))
 # vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
+# str_input_pileup = "/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup"
+# # str_input_pileup = "/data-weedomics-1/test.pileup"
 # @time for i in 1:length(vec_str_dist_model)
 #     # i = 1
 #     vec_str_dist_mod = split(vec_str_dist_model[i], "-")
 #     bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
 #     str_model = vec_str_dist_mod[2]
-#     @time fun_sim_impute_check("/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup",
+#     int_rep = parse(Int, vec_str_dist_mod[3])
+#     @time fun_sim_impute_check(str_input_pileup,
 #                             window_size=200,
 #                             P_missing_pools=0.5,
 #                             P_missing_loci=0.5,
@@ -289,6 +292,6 @@ end
 #                             str_model=str_model,
 #                             int_thread_count=30,
 #                             str_output_suffix=vec_str_dist_model[i],
-#                             int_seed=sum(Int.(codeunits(vec_str_dist_model[i]))),
+#                             int_seed=int_rep,
 #                             int_number_of_iterations=1)
 # end

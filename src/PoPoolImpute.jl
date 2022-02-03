@@ -86,17 +86,7 @@ The imputed allele counts are averaged across the windows sliding one locus at a
 ...
 
 """
-function impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, int_thread_count=2)
-    ###################################################################
-    ### TEST
-    # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
-    # str_filename_input = "out_simissing.pileup"
-    # int_window_size = 10
-    # flt_maximum_fraction_of_pools_with_missing = 0.5
-    # flt_maximum_fraction_of_loci_with_missing = 0.5
-    # str_filename_output = "output-imputed.syncx"
-    # int_thread_count = 3
-    ###################################################################
+function impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], int_distance_n_PC=3, flt_glmnet_alpha=0.5, int_thread_count=2)
     ### Opening remark
     println("")
     println("####################################################################")
@@ -110,6 +100,9 @@ function impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_
     @show flt_maximum_fraction_of_loci_with_missing
     @show str_filename_output
     @show bool_use_distance_matrix
+    if bool_use_distance_matrix
+        @show int_distance_n_PC
+    end
     @show str_model
     if str_model == "GLMNET"
         @show flt_glmnet_alpha
@@ -164,6 +157,7 @@ function impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_
                 n_bool_skip_trailing_window=n_bool_skip_trailing_window,
                 bool_use_distance_matrix=bool_use_distance_matrix,
                 str_model=str_model,
+                int_distance_n_PC=int_distance_n_PC,
                 flt_glmnet_alpha=flt_glmnet_alpha)
         end
     else
@@ -178,6 +172,7 @@ function impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_
                                 n_bool_skip_trailing_window=false,
                                 bool_use_distance_matrix=bool_use_distance_matrix,
                                 str_model=str_model,
+                                int_distance_n_PC=int_distance_n_PC,
                                 flt_glmnet_alpha=flt_glmnet_alpha)
     end
     ### Concatenate chunks

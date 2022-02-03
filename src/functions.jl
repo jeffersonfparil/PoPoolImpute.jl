@@ -131,7 +131,7 @@ function fun_multivariate_ridge_regression(X, Y; flt_ln_lambda_minimum=-5, flt_l
 end
 
 ### Impute
-function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome_or_scaffold, vec_int_position, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5; bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5)
+function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome_or_scaffold, vec_int_position, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5; bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], int_distance_n_PC=3, flt_glmnet_alpha=0.5)
     ############################################# We're not dealing with depths here because I feel like it is more convenient and provides more flexibility to filter by depth after imputation
     ### TEST
     # using PoPoolImpute
@@ -153,6 +153,7 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     # flt_maximum_fraction_of_loci_with_missing = 0.9
     # bool_use_distance_matrix = false
     # n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
+    # int_distance_n_PC=3
     #############################################
 
     ### Number of pools
@@ -190,9 +191,10 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
             if !bool_overlapping_chromomosomes
                 ### Adding distance convariates
                 ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
-                Z = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
+                D = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
                                                  repeat(vec_int_position, inner=7))
-                X = Int.(hcat(X[:,1], Z[vec_bool_idx_loci_nomissing,:], X[:,2:end]))
+                Z = MultivariateStats.projection(MultivariateStats.fit(PCA, D; maxoutdim=int_distance_n_PC)) ### using the first 3 PCs by default
+                X = Float64.(hcat(X[:,1], Z[vec_bool_idx_loci_nomissing,:], X[:,2:end]))
             else
                 X = missing ### skip windows with overlapping chromosomes
             end
@@ -259,7 +261,6 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
             Y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
                                     outer=sum(vec_bool_idx_pools_with_missing_loci)),
                              (size(X_locus_with_missing,1), sum(vec_bool_idx_pools_with_missing_loci)))
-
         else
             ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
             X_locus_with_missing = hcat(ones(sum(vec_bool_idx_loci_missing)),
@@ -375,7 +376,7 @@ function fun_writeout_inrun(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_int_POSI
 end
 
 ### Single-threaded imputaion
-function fun_single_threaded_imputation(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5)
+function fun_single_threaded_imputation(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], int_distance_n_PC=3, flt_glmnet_alpha=0.5)
     ###################################################################
     ### TEST
     # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
@@ -441,6 +442,7 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
                                                               flt_maximum_fraction_of_loci_with_missing,
                                                               bool_use_distance_matrix=bool_use_distance_matrix,
                                                               str_model=str_model,
+                                                              int_distance_n_PC=int_distance_n_PC,
                                                               flt_glmnet_alpha=flt_glmnet_alpha)
             ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
             if !ismissing(mat_imputed)
