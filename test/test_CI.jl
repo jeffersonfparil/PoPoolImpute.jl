@@ -266,8 +266,13 @@ end
 # @everywhere using PoPoolImpute
 # ### NOTE!!!!! Manually load fun_sim_impute_check() from above.
 # vec_str_dist_model = []
+# for str_mod in ["Mean", "OLS"] ### Mean and OLS do not have distance PCs
+#     for int_rep in 1:10
+#         push!(vec_str_dist_model, string("false-", str_mod, "-", int_rep))
+#     end
+# end
 # for str_dist in ["false", "true"]
-#     for str_mod in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
+#     for str_mod in ["RR", "LASSO", "GLMNET"]
 #         for int_rep in 1:10
 #             push!(vec_str_dist_model, string(str_dist, "-", str_mod, "-", int_rep))
 #         end
