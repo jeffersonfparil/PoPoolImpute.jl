@@ -268,26 +268,31 @@ end
 # vec_str_dist_model = []
 # for str_mod in ["Mean", "OLS"] ### Mean and OLS do not have distance PCs
 #     for int_rep in 1:10
-#         push!(vec_str_dist_model, string("false-", str_mod, "-", int_rep))
+#         push!(vec_str_dist_model, string("false-", str_mod, "-", int_rep, "-NULL"))
 #     end
 # end
+# ### Lasso is too slow! Using GLMNet on RR, GLMNet, and Lasso models at alpha = {0, 0.5, 1}, respectively
 # for str_dist in ["false", "true"]
-#     for str_mod in ["RR", "LASSO", "GLMNET"]
+#     for flt_glmnet_alpha in [0.0, 0.5, 1.0]
 #         for int_rep in 1:10
-#             push!(vec_str_dist_model, string(str_dist, "-", str_mod, "-", int_rep))
+#             push!(vec_str_dist_model, string(str_dist, "-GLMNET-", int_rep, "-", flt_glmnet_alpha))
 #         end
 #     end
 # end
 # Random.seed!(sum(Int.(codeunits("Nice"))))
 # vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
 # str_input_pileup = "/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup"
-# # str_input_pileup = "/data-weedomics-1/test.pileup"
 # @time for i in 1:length(vec_str_dist_model)
 #     # i = 1
 #     vec_str_dist_mod = split(vec_str_dist_model[i], "-")
 #     bool_use_distance_matrix = parse(Bool, vec_str_dist_mod[1])
 #     str_model = vec_str_dist_mod[2]
 #     int_rep = parse(Int, vec_str_dist_mod[3])
+#     if vec_str_dist_mod[4]=="NULL"
+#         flt_glmnet_alpha = 0.5
+#     else    
+#         flt_glmnet_alpha = parse(Float64, vec_str_dist_mod[4])
+#     end
 #     @time fun_sim_impute_check(str_input_pileup,
 #                             window_size=200,
 #                             P_missing_pools=0.5,
@@ -295,6 +300,7 @@ end
 #                             n_sequencing_read_length=100,
 #                             bool_use_distance_matrix=bool_use_distance_matrix,
 #                             str_model=str_model,
+#                             flt_glmnet_alpha=flt_glmnet_alpha,
 #                             int_thread_count=30,
 #                             str_output_suffix=vec_str_dist_model[i],
 #                             int_seed=int_rep,
