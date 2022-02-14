@@ -1,6 +1,6 @@
-### Analyse imputation accuracies
+# Analyse imputation accuracies
 
-### Concatenate output and insert model info
+## Insert model info
 ```{julia}
 using ProgressMeter
 DIR="/data-weedomics-1/ctDNA"
@@ -26,6 +26,8 @@ vec_str_filenames = vec_str_filenames[match.(Regex("ACCURACY"), vec_str_filename
     mv(string(str_filename, ".temp"), str_filename, force=true)
 end
 ```
+
+## Concatenate and compress
 ```{sh}
 f=$(ls *ACCURACY*.csv | head -n1)
 head -n1 $f > PoPoolImpute-OUTPUT-ctDNA.csv
@@ -33,14 +35,18 @@ for f in $(ls *ACCURACY*.csv)
 do
     tail -n+2 $f >> PoPoolImpute-OUTPUT-ctDNA.csv
 done
+tar -czvf PoPoolImpute-OUTPUT-ctDNA.csv.tar.gz PoPoolImpute-OUTPUT-ctDNA.csv
 ```
 
-
+## Analyse
+```{R}
 fname_ctDNA_tar_gz = "PoPoolImpute-OUTPUT-ctDNA.csv.tar.gz" 
 system(paste0("tar -xzf ", fname_ctDNA_tar_gz))
 fname_ctDNA = paste(rev(tail(rev(unlist(strsplit(fname_ctDNA_tar_gz, "[.]"))),-2)), collapse='.')
 
 dat = read.csv(fname_ctDNA)
+dat$Deviation_counts = abs(dat$True_counts - dat$Imputed_counts)
+dat$Deviation_freqs = abs(dat$True_freqs - dat$Imputed_freqs)
 str(dat)
 
 fun_filter_data_and_plot = function(data, vec_bool_filter=rep(TRUE, nrow(dat))){
@@ -61,46 +67,35 @@ fun_filter_data_and_plot = function(data, vec_bool_filter=rep(TRUE, nrow(dat))){
     legend("topleft", legend=paste0("RMSE = ", round(RMSE_freqs,4)))
 }
 
-# fun_filter_data_and_plot(data=dat)
-# fun_filter_data_and_plot(data=dat, vec_bool_filter=c((dat$Depth >=100) & (dat$Depth <=1e6)))
+fun_filter_data_and_plot_deviation = function(data, vec_bool_filter=rep(TRUE, nrow(dat))){
+    subdat = data[vec_bool_filter, ]
+    par(mfrow=c(2,2))
+    plot(subdat$Depth, subdat$Deviation_counts, type="p", pch=19, col=rgb(0.8,0.1,0.2,alpha=0.5))
+    grid()
+    plot(subdat$Depth, subdat$Deviation_freqs, type="p", pch=19, col=rgb(0.1,0.5,0.1,alpha=0.5))
+    grid()
+    plot(subdat$True_counts, subdat$Deviation_counts, type="p", pch=19, col=rgb(0.1,0.1,0.6,alpha=0.5))
+    grid()
+    plot(subdat$True_freqs, subdat$Deviation_freqs, type="p", pch=19, col=rgb(0.9,0.7,0.1,alpha=0.5))
+    grid()
+}
+
 for (model in unique(dat$Model)){
-    if ((model=="Mean") | (model=="OLS")){
-        vec_bool_filter=c((dat$Model==model) & (dat$Depth >=100) & (dat$Depth <=1e6))
-        png(paste0(model, "-distPCs_false-scatterplots.png"), width=1000, height=700)
+    for (dist in c("false", "true")){
+        if (((model=="Mean") | (model=="OLS")) & (dist=="true")){
+            next
+        }
+        vec_bool_filter=c((dat$Model==model) & (dat$Distance_PCs==dist))
+        png(paste0(model, "-distPCs_", dist, "-scatterplots.png"), width=1000, height=700)
         fun_filter_data_and_plot(data=dat, vec_bool_filter=vec_bool_filter)
         dev.off()
-    } else {
-        for (dist in c("false", "true")){
-            vec_bool_filter=c((dat$Model==model) & (dat$Distance_PCs==dist) & (dat$Depth >=100) & (dat$Depth <=1e6))
-            png(paste0(model, "-distPCs_", dist, "-scatterplots.png"), width=1000, height=700)
-            fun_filter_data_and_plot(data=dat, vec_bool_filter=vec_bool_filter)
-            dev.off()
-        }
-        
+        png(paste0(model, "-distPCs_", dist, "-depth_vs_deviation.png"), width=1000, height=1000)
+        fun_filter_data_and_plot_deviation(data=dat, vec_bool_filter=vec_bool_filter)
+        dev.off()
     }
 }
 
-
-
-
-dat$Deviation_counts = abs(dat$True_counts - dat$Imputed_counts)
-dat$Deviation_freqs = abs(dat$True_freqs - dat$Imputed_freqs)
-
-par(mfrow=c(2,2))
-plot(dat$Depth, dat$Deviation_counts, type="p", pch=19, col=rgb(0.8,0.1,0.2,alpha=0.5))
-grid()
-plot(dat$Depth, dat$Deviation_freqs, type="p", pch=19, col=rgb(0.1,0.5,0.1,alpha=0.5))
-grid()
-plot(dat$True_counts, dat$Deviation_counts, type="p", pch=19, col=rgb(0.1,0.1,0.6,alpha=0.5))
-grid()
-plot(dat$True_freqs, dat$Deviation_freqs, type="p", pch=19, col=rgb(0.9,0.7,0.1,alpha=0.5))
-grid()
-
-
-summary(dat$Depth)
-
-
 ### Clean-up
 system(paste0("rm ", fname_ctDNA))
-
+```
 

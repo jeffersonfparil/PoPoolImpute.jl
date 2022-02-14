@@ -191,12 +191,14 @@ chmod +x align.sh
 echo "#####################################"
 echo "### Align single-end Drosophila reads"
 time \
-parallel \
+parallel --link \
         ./align.sh \
                 Drosophila/Drosophila_reference \
                 40 \
                 {1} \
-                ::: $(ls Drosophila/*.fastq.gz)
+                {2} \
+                ::: $(ls Drosophila/*_R1.fastq | sort) \
+                ::: $(ls Drosophila/*_R2.fastq | sort)
 
 echo "################################"
 echo "### Align paired-end Human reads"
@@ -222,6 +224,15 @@ do
         ls ${d}/*.bam > ${d}/${d}_bam_list.txt
 done
 ### Pileup the bam files
+### EDIT: 20220214: Only include some high coverage pools fo Drosophila:
+d=Drosophila
+echo "Drosophila/NQ1_down_R1.bam
+Drosophila/NQ2_down_R1.bam
+Drosophila/NTS_down_R1.bam
+Drosophila/SA_down_R1.bam
+Drosophila/SQ1_down_R1.bam
+Drosophila/SQ2_down_R1.bam
+Drosophila/STS_down_R1.bam" > ${d}/${d}_bam_list.txt
 time \
 parallel \
         samtools mpileup \
@@ -240,11 +251,11 @@ echo "### Filter pileups to include no missing data ###"
 echo "###                                           ###"
 echo "#################################################"
 
-# In julia:
-# using PoPoolImpute
-# vec_str_pileup = ["Drosophila/Drosophila.mpileup",
-#                   "Human/Human.mpileup"]
-# for str_pileup in vec_str_pileup
-# #     PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
-#     PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
-# end
+In julia:
+using PoPoolImpute
+vec_str_pileup = ["Drosophila/Drosophila.mpileup",
+                  "Human/Human.mpileup"]
+for str_pileup in vec_str_pileup
+    # PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.5)
+    PoPoolImpute.functions.fun_filter_pileup(str_pileup, flt_maximum_missing=0.0)
+end
