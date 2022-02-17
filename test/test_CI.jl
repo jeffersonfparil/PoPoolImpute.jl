@@ -281,7 +281,8 @@ end
 # end
 # Random.seed!(sum(Int.(codeunits("Nice"))))
 # vec_str_dist_model = vec_str_dist_model[randperm!(collect(1:length(vec_str_dist_model)))]
-# str_input_pileup = "/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup"
+# # str_input_pileup = "/data-weedomics-1/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup"
+# str_input_pileup = "/data-weedomics-1/Drosophila/Drosophila-FILTERED_0.0.pileup"
 # @time for i in 1:length(vec_str_dist_model)
 #     # i = 1
 #     vec_str_dist_mod = split(vec_str_dist_model[i], "-")
