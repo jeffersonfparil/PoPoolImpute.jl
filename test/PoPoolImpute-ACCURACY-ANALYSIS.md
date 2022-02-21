@@ -3,7 +3,8 @@
 ## Insert model info
 ```{julia}
 using ProgressMeter
-DIR="/data-weedomics-1/ctDNA"
+# DIR="/data-weedomics-1/ctDNA"
+DIR="/data-weedomics-1/Drosophila"
 cd(DIR)
 vec_str_filenames = readdir()
 vec_str_filenames = vec_str_filenames[match.(Regex("ACCURACY"), vec_str_filenames) .!= nothing]
@@ -29,22 +30,28 @@ end
 
 ## Concatenate and compress
 ```{sh}
+# d=ctDNA
+d=Drosophila
+DIR=/data-weedomics-1/${d}
+cd $DIR
 f=$(ls *ACCURACY*.csv | head -n1)
-head -n1 $f > PoPoolImpute-OUTPUT-ctDNA.csv
+head -n1 $f > PoPoolImpute-OUTPUT-${d}.csv
 for f in $(ls *ACCURACY*.csv)
 do
-    tail -n+2 $f >> PoPoolImpute-OUTPUT-ctDNA.csv
+    tail -n+2 $f >> PoPoolImpute-OUTPUT-${d}.csv
 done
-tar -czvf PoPoolImpute-OUTPUT-ctDNA.csv.tar.gz PoPoolImpute-OUTPUT-ctDNA.csv
+tar -czvf PoPoolImpute-OUTPUT-${d}.csv.tar.gz PoPoolImpute-OUTPUT-${d}.csv
 ```
 
 ## Analyse
 ```{R}
-fname_ctDNA_tar_gz = "PoPoolImpute-OUTPUT-ctDNA.csv.tar.gz" 
-system(paste0("tar -xzf ", fname_ctDNA_tar_gz))
-fname_ctDNA = paste(rev(tail(rev(unlist(strsplit(fname_ctDNA_tar_gz, "[.]"))),-2)), collapse='.')
+# d="ctDNA"
+d="Drosophila"
+fname_tar_gz = paste0("PoPoolImpute-OUTPUT-", d,".csv.tar.gz")
+system(paste0("tar -xzf ", fname_tar_gz))
+fname = paste(rev(tail(rev(unlist(strsplit(fname_tar_gz, "[.]"))),-2)), collapse='.')
 
-dat = read.csv(fname_ctDNA)
+dat = read.csv(fname)
 dat$Deviation_counts = abs(dat$True_counts - dat$Imputed_counts)
 dat$Deviation_freqs = abs(dat$True_freqs - dat$Imputed_freqs)
 str(dat)
@@ -86,6 +93,9 @@ for (model in unique(dat$Model)){
             next
         }
         vec_bool_filter=c((dat$Model==model) & (dat$Distance_PCs==dist))
+        if (sum(vec_bool_filter)==0){
+            next
+        }
         png(paste0(model, "-distPCs_", dist, "-scatterplots.png"), width=1000, height=700)
         fun_filter_data_and_plot(data=dat, vec_bool_filter=vec_bool_filter)
         dev.off()
@@ -96,6 +106,6 @@ for (model in unique(dat$Model)){
 }
 
 ### Clean-up
-system(paste0("rm ", fname_ctDNA))
+system(paste0("rm ", fname))
 ```
 
