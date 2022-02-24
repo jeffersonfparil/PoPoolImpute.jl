@@ -23,7 +23,7 @@ cd("test/")
 ###     (2) impute
 ###     (3) load imputation output, and
 ###     (4) check imputation accuracy
-function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_suffix="out", int_seed=0, int_number_of_iterations=1, int_thread_count=2, int_max_error_resimulate_missing=2)
+function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_missing_pools=0.5, P_missing_loci=0.5, n_sequencing_read_length=10, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, str_output_suffix="out", int_seed=0, int_number_of_iterations=1, int_thread_count=2, int_max_error_resimulate_missing=1)
     # ############################
     # ### TEST
     # input="test.pileup.tar.xz"
@@ -300,5 +300,6 @@ end
 #                             int_thread_count=30,
 #                             str_output_suffix=vec_str_dist_model[i],
 #                             int_seed=int_rep,
-#                             int_number_of_iterations=1)
+#                             int_number_of_iterations=1,
+#                             int_max_error_resimulate_missing=10)
 # end
