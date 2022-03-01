@@ -153,7 +153,9 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     # flt_maximum_fraction_of_loci_with_missing = 0.9
     # bool_use_distance_matrix = false
     # n_bool_window_with_at_least_one_missing_locus = sum(ismissing.(mat_int_window_counts)) > 0
+    # str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2]
     # int_distance_n_PC=3
+    # flt_glmnet_alpha=0.5
     #############################################
 
     ### Number of pools
@@ -164,117 +166,159 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
     
     ### To impute or not to impute
     vec_bool_idx_pools_with_missing_loci = (sum(mat_bool_missing, dims=1) .> 0)[1,:]
-    vec_bool_idx_loci_missing = (sum(mat_bool_missing, dims=2) .> 0)[:,1]
+    # vec_bool_idx_loci_missing = (sum(mat_bool_missing, dims=2) .> 0)[:,1]
     vec_bool_idx_pools_without_missing_loci = .!vec_bool_idx_pools_with_missing_loci
-    vec_bool_idx_loci_nomissing = .!vec_bool_idx_loci_missing
+    # vec_bool_idx_loci_nomissing = .!vec_bool_idx_loci_missing
 
-    ### Test if we have enough pools with no missing loci to build our imputation model
-    n_bool_do_we_have_enough_pools = sum(vec_bool_idx_pools_with_missing_loci) <= (flt_maximum_fraction_of_pools_with_missing*int_pool_count)
-    n_bool_do_we_have_enough_loci  = sum(vec_bool_idx_loci_missing)            <= (flt_maximum_fraction_of_loci_with_missing *int_window_size_x_7_alleles)
+    # ### Test if we have enough pools with no missing loci to build our imputation model
+    # n_bool_do_we_have_enough_pools = sum(vec_bool_idx_pools_with_missing_loci) <= (flt_maximum_fraction_of_pools_with_missing*int_pool_count)
+    # n_bool_do_we_have_enough_loci  = sum(vec_bool_idx_loci_missing)            <= (flt_maximum_fraction_of_loci_with_missing *int_window_size_x_7_alleles)
 
-    if n_bool_do_we_have_enough_pools & n_bool_do_we_have_enough_loci
+    # if n_bool_do_we_have_enough_pools & n_bool_do_we_have_enough_loci
         ###########################################################################################################
         ### Model the non-missing allele counts in the pools with missing loci
         ### using the allele counts in the same loci in the pools without missing loci;
         ### then use this model (slopes of length or nrow equal to the number of pools without missing loci)
         ### to predict the allele counts of the missing loci in the pools with missing loci. <<<--- phrase this better eh?!?!?!
         ###########################################################################################################
-        ### allele counts of pools with missing loci at loci with missing data (m_P non-missing loci x n_M pools with missing loci)
-        Y = Number.(mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_with_missing_loci])
-        ### allele counts of pools without missing loci at loci with missing data (m_P non-missing loci x n_P pools without missing locus) + first column is for the intercept
-        X = Number.(hcat(ones(sum(vec_bool_idx_loci_nomissing)), mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_without_missing_loci]))
-        ### predictors of allele counts in the pools with missing loci (n_P pools without missing missing loci x n_M pools with missing loci)
-        ### Model the distribution of allele frequencies among the pools with missing data
-        ###     as functions of the allele frequencies of the pools without missing data
-        bool_overlapping_chromomosomes = length(unique(vec_str_name_of_chromosome_or_scaffold)) > 1
-        if bool_use_distance_matrix
-            if !bool_overlapping_chromomosomes
-                ### Adding distance convariates
-                ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
-                D = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
-                                                 repeat(vec_int_position, inner=7))
-                Z = MultivariateStats.projection(MultivariateStats.fit(PCA, D; maxoutdim=int_distance_n_PC)) ### using the first 3 PCs by default
-                X = Float64.(hcat(X[:,1], Z[vec_bool_idx_loci_nomissing,:], X[:,2:end]))
-            else
-                X = missing ### skip windows with overlapping chromosomes
+
+    ### TRYING ITERATIVE IMPUTATION, i.e. per column sice we're losing power adn imputing non-missing loci with the current approach!!!
+    vec_int_idx_pools_with_missing_loci = collect(1:length(vec_bool_idx_pools_with_missing_loci))[vec_bool_idx_pools_with_missing_loci]
+    Y_pred = []
+    vec_vec_bool_idx_missing_loci = []
+    for i in vec_int_idx_pools_with_missing_loci
+        # i = vec_int_idx_pools_with_missing_loci[1]
+
+        ### Find loci with missing data
+        vec_bool_idx_loci_missing   = ismissing.(mat_int_window_counts[:, i])
+        vec_bool_idx_loci_nomissing = .!(vec_bool_idx_loci_missing)
+
+        ### Test if we have enough pools with no missing loci to build our imputation model
+        n_bool_do_we_have_enough_pools = sum(vec_bool_idx_pools_with_missing_loci) <= (flt_maximum_fraction_of_pools_with_missing*int_pool_count)
+        n_bool_do_we_have_enough_loci  = sum(vec_bool_idx_loci_missing)            <= (flt_maximum_fraction_of_loci_with_missing *int_window_size_x_7_alleles)
+
+        if n_bool_do_we_have_enough_pools & n_bool_do_we_have_enough_loci
+
+            ### allele counts of pools with missing loci at loci with missing data (m_P non-missing loci x n_M pools with missing loci)
+            # Y = Number.(mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_with_missing_loci])
+            y = Number.(mat_int_window_counts[vec_bool_idx_loci_nomissing, i])
+            ### allele counts of pools without missing loci at loci with missing data (m_P non-missing loci x n_P pools without missing locus) + first column is for the intercept
+            X = Number.(hcat(ones(sum(vec_bool_idx_loci_nomissing)), mat_int_window_counts[vec_bool_idx_loci_nomissing, vec_bool_idx_pools_without_missing_loci]))
+            ### predictors of allele counts in the pools with missing loci (n_P pools without missing missing loci x n_M pools with missing loci)
+            ### Model the distribution of allele frequencies among the pools with missing data
+            ###     as functions of the allele frequencies of the pools without missing data
+            bool_overlapping_chromomosomes = length(unique(vec_str_name_of_chromosome_or_scaffold)) > 1
+            if bool_use_distance_matrix
+                if !bool_overlapping_chromomosomes
+                    ### Adding distance convariates
+                    ### Since we are setting distance to missing if the positions are not on the same chromosome of scaffold
+                    D = func_pairwise_loci_distances(repeat(vec_str_name_of_chromosome_or_scaffold, inner=7),
+                                                    repeat(vec_int_position, inner=7))
+                    Z = MultivariateStats.projection(MultivariateStats.fit(PCA, D; maxoutdim=int_distance_n_PC)) ### using the first 3 PCs by default
+                    X = Float64.(hcat(X[:,1], Z[vec_bool_idx_loci_nomissing,:], X[:,2:end]))
+                else
+                    X = missing ### skip windows with overlapping chromosomes
+                end
             end
-        end
-        if str_model == "Mean"
-            B = nothing
-        elseif str_model == "OLS"
-            B = try
-                ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
-                X\Y
-            catch
-                ### Moore-Penrose pseudoinverse if the automatic solver fails
-                try
-                    LinearAlgebra.pinv(X'*X)*(X'*Y)
+            if str_model == "Mean"
+                B = nothing
+            elseif str_model == "OLS"
+                B = try
+                    ### Automatic julia solver (will use qr decomposition for non-square X, i.e. qr(X)\Y)
+                    # X\Y
+                    X\y
                 catch
-                    ### If singular and if Z has missing values which indicate loci in different chromosomes  or scaffolds are in the same window which does not work if we are accounting for loci distances
+                    ### Moore-Penrose pseudoinverse if the automatic solver fails
+                    try
+                        # LinearAlgebra.pinv(X'*X)*(X'*Y)
+                        LinearAlgebra.pinv(X'*X)*(X'*y)
+                    catch
+                        ### If singular and if Z has missing values which indicate loci in different chromosomes  or scaffolds are in the same window which does not work if we are accounting for loci distances
+                        missing
+                    end
+                end
+            elseif str_model == "RR"
+                B = try
+                    # fun_multivariate_ridge_regression(X, Y)
+                    fun_multivariate_ridge_regression(X, y)
+                catch
                     missing
                 end
-            end
-        elseif str_model == "RR"
-            B = try
-                fun_multivariate_ridge_regression(X, Y)
-            catch
-                missing
-            end
-        elseif str_model== "LASSO" ### Note: iterative per column of Y
-            B = try
-                B = zeros(size(X,2), size(Y,2))
-                for j in 1:size(Y,2)
-                    B[:,j] = try
-                        Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(Y[:,j]), standardize=false, intercept=true, cd_tol=1e-7))
+            elseif str_model== "LASSO" ### Note: iterative per column of Y
+                B = try
+                    # B = zeros(size(X,2), size(Y,2))
+                    # for j in 1:size(Y,2)
+                    #     B[:,j] = try
+                    #         Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(Y[:,j]), standardize=false, intercept=true, cd_tol=1e-7))
+                    #     catch
+                    #         Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(Y[:,j]), standardize=false, intercept=true, cd_tol=1e-3))
+                    #     end
+                    # end
+                    # B
+                    try
+                        Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(y), standardize=false, intercept=true, cd_tol=1e-7))
                     catch
-                        Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(Y[:,j]), standardize=false, intercept=true, cd_tol=1e-3))
+                        Lasso.coef(Lasso.fit(LassoModel, Float64.(X[:,2:end]), Float64.(y), standardize=false, intercept=true, cd_tol=1e-3))
                     end
+                catch
+                    missing
                 end
-                B
-            catch
-                missing
-            end
-        elseif str_model== "GLMNET" ### Note: iterative per column of Y
-            ### Default: flt_glmnet_alpha=0.5
-            try
-                B = zeros(size(X,2), size(Y,2))
-                for j in 1:size(Y,2)
-                    B[:,j] = try
-                        GLMNet.coef(GLMNet.glmnetcv(X, Y[:,j], alpha=flt_glmnet_alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
+            elseif str_model== "GLMNET" ### Note: iterative per column of Y
+                ### Default: flt_glmnet_alpha=0.5
+                B = try
+                    # B = zeros(size(X,2), size(Y,2))
+                    # for j in 1:size(Y,2)
+                    #     B[:,j] = try
+                    #         GLMNet.coef(GLMNet.glmnetcv(X, Y[:,j], alpha=flt_glmnet_alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
+                    #     catch
+                    #         GLMNet.coef(GLMNet.glmnetcv(X, Y[:,j], alpha=flt_glmnet_alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
+                    #     end
+                    # end
+                    try
+                        GLMNet.coef(GLMNet.glmnetcv(X, y, alpha=flt_glmnet_alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
                     catch
-                        GLMNet.coef(GLMNet.glmnetcv(X, Y[:,j], alpha=flt_glmnet_alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
+                        GLMNet.coef(GLMNet.glmnetcv(X, y, alpha=flt_glmnet_alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
                     end
+                catch
+                    B = missing
                 end
-            catch
-                B = missing
+            else
+                println("Wrong model specified.")
+                println("Exiting.")
+                exit()
+            end
+            ### If our solvers fail return missing
+            if ismissing(B)
+                # Y_pred = missing
+                y_pred = missing
+            elseif str_model == "Mean"
+                X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
+                # Y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
+                y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
+                                        outer=sum(vec_bool_idx_pools_with_missing_loci)),
+                                (size(X_locus_with_missing,1), sum(vec_bool_idx_pools_with_missing_loci)))
+            else
+                ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
+                X_locus_with_missing = hcat(ones(sum(vec_bool_idx_loci_missing)),
+                                            mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci])
+                if bool_use_distance_matrix
+                    X_locus_with_missing = hcat(X_locus_with_missing[:,1], Z[vec_bool_idx_loci_missing,:], X_locus_with_missing[:,2:end])
+                end
+                ### prediced allele counts at the loci with missing data (m_M missing loci x n_M pools with missing loci)
+                # Y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
+                y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
             end
         else
-            println("Wrong model specified.")
-            println("Exiting.")
-            exit()
+            y_pred = missing
+            vec_bool_idx_loci_missing = missing
         end
-        ### If our solvers fail return missing
-        if ismissing(B)
-            Y_pred = missing
-        elseif str_model == "Mean"
-            X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
-            Y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
-                                    outer=sum(vec_bool_idx_pools_with_missing_loci)),
-                             (size(X_locus_with_missing,1), sum(vec_bool_idx_pools_with_missing_loci)))
-        else
-            ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
-            X_locus_with_missing = hcat(ones(sum(vec_bool_idx_loci_missing)),
-                                        mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci])
-            if bool_use_distance_matrix
-                X_locus_with_missing = hcat(X_locus_with_missing[:,1], Z[vec_bool_idx_loci_missing,:], X_locus_with_missing[:,2:end])
-            end
-            ### prediced allele counts at the loci with missing data (m_M missing loci x n_M pools with missing loci)
-            Y_pred = Int.(round.(abs.(X_locus_with_missing * B)))
-        end
-    else
-        Y_pred = missing
-    end
-    return(Y_pred, vec_bool_idx_pools_with_missing_loci, vec_bool_idx_loci_missing)
+        push!(Y_pred, y_pred)
+        push!(vec_vec_bool_idx_missing_loci, vec_bool_idx_loci_missing)
+    end ### end for loop across columns or pools with missing data
+    # else
+    #     Y_pred = missing
+    # end
+    return(Y_pred, vec_int_idx_pools_with_missing_loci, vec_vec_bool_idx_missing_loci)
     ### Room for improvement by:
     ###     - adding covariates
     ###     - use frequencies and restrict y's to sum up to 1
@@ -379,14 +423,25 @@ end
 function fun_single_threaded_imputation(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", n_bool_skip_leading_window=true, n_bool_skip_trailing_window=true, bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], int_distance_n_PC=3, flt_glmnet_alpha=0.5)
     ###################################################################
     ### TEST
-    # cd("/home/jeff/Documents/PoPoolImpute.jl/test")
-    # str_filename_input = "out_simissing.pileup"
-    # int_window_size = 10
-    # flt_maximum_fraction_of_pools_with_missing = 0.5
-    # flt_maximum_fraction_of_loci_with_missing = 0.5
-    # str_filename_output = "output-imputed.syncx"
-    # n_bool_skip_leading_window = true
-    # n_bool_skip_trailing_window = true
+    # cd("/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/")
+    # run(`tar -xvf test.pileup.tar.xz`)
+    # using Random; Random.seed!(69)
+    # fun_simulate_missing("test.pileup",
+    #                      n_sequencing_read_length=10,
+    #                      flt_maximum_fraction_of_loci_with_missing=0.5,
+    #                      flt_maximum_fraction_of_pools_with_missing=0.1,
+    #                      str_filename_pileup_simulated_missing="test-SIMULATED_MISSING.pileup")
+    # str_filename_input = "test-SIMULATED_MISSING.pileup"
+    # int_window_size=20
+    # flt_maximum_fraction_of_pools_with_missing=0.5
+    # flt_maximum_fraction_of_loci_with_missing=0.5
+    # str_filename_output="output-imputed.syncx"
+    # n_bool_skip_leading_window=true
+    # n_bool_skip_trailing_window=true
+    # bool_use_distance_matrix=false
+    # str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2]
+    # int_distance_n_PC=3
+    # flt_glmnet_alpha=0.5
     ###################################################################
     ### Count the number of loci, alleles, and pools (check if we have the expected number of columns in the first line of the pileup file, i.e. each pool has 3 columns each)
     int_total_loci = countlines(str_filename_input)
@@ -407,13 +462,15 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = []
     vec_int_POSITION = []
     mat_int_ALLELE_COUNTS = nothing
+    ### Initialise re-imputed loci counter for averaging imputated counts below
+    vec_int_imputed_loci_counter = ones(Int, int_window_size)
     ### Initialise loci within window counter, vector containing each line (will fit a maximum of int_window_size loci), and open the file
     int_counter_load_first_n_windows_lines_withe_readline = 0
     vec_str_input = []
     FILE = open(str_filename_input)
     ### Iterate per line until we reach the first loci of the last sliding window
     for int_start_locus in 1:((int_total_loci-int_window_size) + 1)
-        # int_start_locus = 25
+        # int_start_locus = 10
         # @show int_start_locus
         # fun_simple_progress_bar(int_start_locus, (int_total_loci-int_window_size) + 1, 50)
         ### If we already have "int_window_size" lines then just remove the old locus and replace with the next one since we have sliding windows (sliding one locus at a time)
@@ -433,9 +490,9 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
         ### If we have missing loci then impute, else just add the allele counts without missing information
         if n_bool_window_with_at_least_one_missing_locus
             ### Impute by regressing allele counts of the pools with missing data against the allele counts of the pools without missing data in the window; and then predict the missing allele counts
-            mat_imputed, 
-            vec_bool_idx_pools_with_missing_loci,
-            vec_bool_idx_loci_missing = fun_impute_per_window(mat_int_window_counts,
+            vec_vec_imputed, 
+            vec_int_idx_pools_with_missing_loci,
+            vec_vec_bool_idx_missing_loci = fun_impute_per_window(mat_int_window_counts,
                                                               vec_str_name_of_chromosome_or_scaffold,
                                                               vec_int_position,
                                                               flt_maximum_fraction_of_pools_with_missing,
@@ -445,14 +502,19 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
                                                               int_distance_n_PC=int_distance_n_PC,
                                                               flt_glmnet_alpha=flt_glmnet_alpha)
             ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
-            if !ismissing(mat_imputed)
-                mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_with_missing_loci] = mat_imputed
+            if sum(ismissing.(vec_vec_imputed)) < length(vec_vec_imputed)
+                for i in 1:length(vec_int_idx_pools_with_missing_loci)
+                    # i = 1
+                    idx_pool = vec_int_idx_pools_with_missing_loci[i]
+                    vec_idx_loci = vec_vec_bool_idx_missing_loci[i]
+                    mat_int_window_counts[vec_idx_loci, idx_pool] = vec_vec_imputed[i]
+                end
             end
         else
-            mat_imputed = "No imputation needed since no loci were missing."
+            vec_vec_imputed = "No imputation needed since no loci were missing."
         end
         ### Add allele counts imputed and non-missing + loci information
-        if !ismissing(mat_imputed)
+        if sum(ismissing.(vec_vec_imputed)) < length(vec_vec_imputed)
             if isnothing(mat_int_ALLELE_COUNTS)
                 ### initialise the output matrix of allele counts and append the chromosom or scaffold names and the position
                 mat_int_ALLELE_COUNTS = Int.(mat_int_window_counts)
@@ -466,25 +528,28 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
                 ### Do we have more than 1 new loci (happens if we skip loci due to the inability to impute because of too many missing data)
                 int_new_loci_count = sum(vec_bool_idx_loci_new_loci_to_add)
                 ### If we have imputed allele counts, then use the average of the imputed allele counts
-                if mat_imputed != "No imputation needed since no loci were missing."
+                if vec_vec_imputed != "No imputation needed since no loci were missing."
                     if int_new_loci_count < int_window_size
-                        ### Compute the average imputed allele counts by updating the average given new imputed allele counts
-                        vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(int_allele_count*int_new_loci_count))]
-                        mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :]
-                        mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(int_allele_count*int_new_loci_count)), :]
-                        mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_loci, (int_allele_count, int_window_size-int_new_loci_count))'
-                        vec_int_imputed_loci_counter = ones(Int, int_window_size-int_new_loci_count)
-                        vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
-                        vec_n = repeat(vec_int_imputed_loci_counter[vec_bool_index_for_vec_int_imputed_loci_counter], inner=int_allele_count)
-                        A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_loci, :]
-                        B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_loci, :]
-                        C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
-                        ### Update allele counts with the average
-                        mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :][vec_idx_bool_loci_missing_less_new_loci, :] = C
-                        ### Update the counter which we use to compute the updated average allele count
-                        vec_int_imputed_loci_counter = vec_int_imputed_loci_counter .+ vec_bool_index_for_vec_int_imputed_loci_counter
-                        vec_int_imputed_loci_counter[1:(end-1)] = vec_int_imputed_loci_counter[2:(end-0)]
-                        vec_int_imputed_loci_counter[end] = 1
+                        for i in 1:length(vec_int_idx_pools_with_missing_loci)
+                            # i = 1
+                            vec_bool_idx_loci_missing = vec_vec_bool_idx_missing_loci[i]
+                            ### Compute the average imputed allele counts by updating the average given new imputed allele counts
+                            vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(int_allele_count*int_new_loci_count))]
+                            mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :]
+                            mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(int_allele_count*int_new_loci_count)), :]
+                            mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_loci, (int_allele_count, int_window_size-int_new_loci_count))'
+                            vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
+                            ### Update the counter which we use to compute the updated average allele count
+                            vec_int_imputed_loci_counter[(int_new_loci_count+1):end] = vec_int_imputed_loci_counter[1:(end-int_new_loci_count)]
+                            vec_int_imputed_loci_counter[1:int_new_loci_count] .= 1
+                            vec_int_imputed_loci_counter[(int_new_loci_count+1):end] .+= vec_bool_index_for_vec_int_imputed_loci_counter
+                            vec_n = repeat(vec_int_imputed_loci_counter[(int_new_loci_count+1):end][vec_bool_index_for_vec_int_imputed_loci_counter], inner=int_allele_count)
+                            A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_loci, :]
+                            B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_loci, :]
+                            C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
+                            ### Update allele counts with the average
+                            mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :][vec_idx_bool_loci_missing_less_new_loci, :] = C
+                        end
                     end
                 end
                 ### Save the file per window because it's nice to have the output written into disk rather than memory in case anything unsavory happens prior to finishing the entire job - then at least we'll have a partial output rather than nothing at all
