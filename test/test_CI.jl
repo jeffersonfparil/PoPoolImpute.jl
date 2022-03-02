@@ -4,7 +4,7 @@ using ProgressMeter
 using UnicodePlots
 using Random
 using Distributed
-int_thread_count = 2 ### guthub actions virtual machine allocated has only 2 cores
+int_thread_count = 2 ### github actions virtual machine allocated has only 2 cores
 Distributed.addprocs(int_thread_count)
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
@@ -125,8 +125,14 @@ function fun_sim_impute_check(input="test.pileup.tar.xz"; window_size=20, P_miss
         vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD = X[1,:]
         vec_int_POSITION = parse.(Int, X[2,:])
         # mat_int_ALLELE_COUNTS = parse.(Int, X[3:end,:])'
-        mat_int_ALLELE_COUNTS = parse.(Float64, X[3:end,:])'
+        mat_int_ALLELE_COUNTS = Array{Any}(missing, (size(X,2), size(X,1)-2))
+        for i in 1:size(X,2)
+            vec_int_counts_per_locus = X[3:end, i]
+            vec_bool_idx_missing = vec_int_counts_per_locus .== "missing"
+            mat_int_ALLELE_COUNTS[i, .!vec_bool_idx_missing] = parse.(Int, vec_int_counts_per_locus[.!vec_bool_idx_missing])
+        end
 
+        
         println("Calculate allele frequencies, and total depth")
         int_pool_count = size(mat_int_ALLELE_COUNTS, 2)
         mat_flt_ALLELE_FREQS = copy(mat_int_ALLELE_COUNTS)

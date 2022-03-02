@@ -294,9 +294,7 @@ function fun_impute_per_window(mat_int_window_counts, vec_str_name_of_chromosome
             elseif str_model == "Mean"
                 X_locus_with_missing = mat_int_window_counts[vec_bool_idx_loci_missing, vec_bool_idx_pools_without_missing_loci]
                 # Y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
-                y_pred = reshape(repeat(Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2))),
-                                        outer=sum(vec_bool_idx_pools_with_missing_loci)),
-                                (size(X_locus_with_missing,1), sum(vec_bool_idx_pools_with_missing_loci)))
+                y_pred = Int.(round.(sum(X_locus_with_missing, dims=2) ./ size(X_locus_with_missing,2)))
             else
                 ### allele counts of pools without missing loci at the loci with with missing data (m_M missing loci x n_P pools without missing loci)
                 X_locus_with_missing = hcat(ones(sum(vec_bool_idx_loci_missing)),
@@ -502,9 +500,9 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
                                                               int_distance_n_PC=int_distance_n_PC,
                                                               flt_glmnet_alpha=flt_glmnet_alpha)
             ### Replace missing data with the imputed allele counts if we were able to impute, i.e. we got at mot most "flt_maximum_fraction_of_pools_with_missing" of the pools with missing loci, and "flt_maximum_fraction_of_loci_with_missing" of the loci with missing data
-            if sum(ismissing.(vec_vec_imputed)) < length(vec_vec_imputed)
-                for i in 1:length(vec_int_idx_pools_with_missing_loci)
-                    # i = 1
+            for i in 1:length(vec_int_idx_pools_with_missing_loci)
+                # i = 1
+                if !ismissing(vec_vec_bool_idx_missing_loci[i])
                     idx_pool = vec_int_idx_pools_with_missing_loci[i]
                     vec_idx_loci = vec_vec_bool_idx_missing_loci[i]
                     mat_int_window_counts[vec_idx_loci, idx_pool] = vec_vec_imputed[i]
@@ -517,7 +515,8 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
         if sum(ismissing.(vec_vec_imputed)) < length(vec_vec_imputed)
             if isnothing(mat_int_ALLELE_COUNTS)
                 ### initialise the output matrix of allele counts and append the chromosom or scaffold names and the position
-                mat_int_ALLELE_COUNTS = Int.(mat_int_window_counts)
+                # mat_int_ALLELE_COUNTS = Int.(mat_int_window_counts)
+                mat_int_ALLELE_COUNTS = mat_int_window_counts
                 append!(vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD, vec_str_name_of_chromosome_or_scaffold)
                 append!(vec_int_POSITION, vec_int_position)
             else
@@ -533,23 +532,43 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
                         for i in 1:length(vec_int_idx_pools_with_missing_loci)
                             # i = 1
                             vec_bool_idx_loci_missing = vec_vec_bool_idx_missing_loci[i]
-                            ### Compute the average imputed allele counts by updating the average given new imputed allele counts
-                            vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(int_allele_count*int_new_loci_count))]
-                            mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :]
-                            mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(int_allele_count*int_new_loci_count)), :]
-                            mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_loci, (int_allele_count, int_window_size-int_new_loci_count))'
-                            vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
-                            ### Update the counter which we use to compute the updated average allele count
-                            vec_int_imputed_loci_counter[(int_new_loci_count+1):end] = vec_int_imputed_loci_counter[1:(end-int_new_loci_count)]
-                            vec_int_imputed_loci_counter[1:int_new_loci_count] .= 1
-                            vec_int_imputed_loci_counter[(int_new_loci_count+1):end] .+= vec_bool_index_for_vec_int_imputed_loci_counter
-                            vec_n = repeat(vec_int_imputed_loci_counter[(int_new_loci_count+1):end][vec_bool_index_for_vec_int_imputed_loci_counter], inner=int_allele_count)
-                            A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_loci, :]
-                            B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_loci, :]
-                            C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) ))
-                            ### Update allele counts with the average
-                            mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, :][vec_idx_bool_loci_missing_less_new_loci, :] = C
+                            if !ismissing(vec_bool_idx_loci_missing)
+                                println(vec_bool_idx_loci_missing)
+                                vec_idx_bool_loci_missing_less_new_loci = vec_bool_idx_loci_missing[1:(end-(int_allele_count*int_new_loci_count))]
+                                mat_int_allele_counts_tail_end_new = mat_int_window_counts[1:(end-(int_allele_count*int_new_loci_count)), i]
+                                mat_int_allele_counts_tail_end_old = mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, i]
+                                if (sum(ismissing.(mat_int_allele_counts_tail_end_new))==0) & (sum(ismissing.(mat_int_allele_counts_tail_end_old))==0)
+                                    ### Compute the average imputed allele counts by updating the average given new imputed allele counts
+                                    mat_bool_idx_loci_missing_less_new_locus = reshape(vec_idx_bool_loci_missing_less_new_loci, (int_allele_count, int_window_size-int_new_loci_count))'
+                                    vec_bool_index_for_vec_int_imputed_loci_counter = (sum(mat_bool_idx_loci_missing_less_new_locus, dims=2) .> 0)[:,1]
+                                    ### Update the counter which we use to compute the updated average allele count
+                                    vec_int_imputed_loci_counter[(int_new_loci_count+1):end] = vec_int_imputed_loci_counter[1:(end-int_new_loci_count)]
+                                    vec_int_imputed_loci_counter[1:int_new_loci_count] .= 1
+                                    vec_int_imputed_loci_counter[(int_new_loci_count+1):end] .+= vec_bool_index_for_vec_int_imputed_loci_counter
+                                    vec_n = repeat(vec_int_imputed_loci_counter[(int_new_loci_count+1):end][vec_bool_index_for_vec_int_imputed_loci_counter], inner=int_allele_count)
+                                    A = mat_int_allele_counts_tail_end_old[vec_idx_bool_loci_missing_less_new_loci]; println("A"); println(A)
+                                    B = mat_int_allele_counts_tail_end_new[vec_idx_bool_loci_missing_less_new_loci]; println("B"); println(B)
+                                    C = Int.(round.( ( (A.+(B./vec_n)) ./ 2 ) .* ( (2 .* vec_n) ./ (vec_n .+ 1) ) )); println("C"); println(C)
+                                    ### Update allele counts with the average
+                                    mat_int_ALLELE_COUNTS[(end-(int_allele_count*(int_window_size-int_new_loci_count))+1):end, i][vec_idx_bool_loci_missing_less_new_loci] = C
+                                    ### Update the matrix of allele counts with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
+                                    ### If the new and old windows overlap as expected with sliding windows, then update the "mat_int_window_counts" according to the extent of the overlap
+                                    mat_int_ALLELE_COUNTS[1:(end-(int_allele_count*int_new_loci_count)), i] = mat_int_ALLELE_COUNTS[((int_allele_count*int_new_loci_count)+1):end, i]
+                                    mat_int_ALLELE_COUNTS[((end-(int_allele_count*int_new_loci_count))+1):end, i] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=int_allele_count), i]
+                                end
+                            end
                         end
+                        ### Update the vectors of loci coordinates with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
+                        vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(int_new_loci_count+1):end]
+                        vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[((end-int_new_loci_count)+1):end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add]
+                        vec_int_POSITION[1:(end-int_new_loci_count)] = vec_int_POSITION[(int_new_loci_count+1):end]
+                        vec_int_POSITION[((end-int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
+                    else 
+                        ### If the old and new windows do not overlap, i.e. when "mat_int_window_counts" loci were skipped because of too much missing data which rendered imputation impossible,
+                        ### then replace the matrix of allele counts, and vectors of loci coordinates with the new loci
+                        mat_int_ALLELE_COUNTS[1:end,:] = mat_int_window_counts
+                        vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:end] = vec_str_name_of_chromosome_or_scaffold
+                        vec_int_POSITION[1:end] = vec_int_position
                     end
                 end
                 ### Save the file per window because it's nice to have the output written into disk rather than memory in case anything unsavory happens prior to finishing the entire job - then at least we'll have a partial output rather than nothing at all
@@ -573,22 +592,22 @@ function fun_single_threaded_imputation(str_filename_input; int_window_size=10, 
                         end
                     end
                 end
-                ### Update the matrix of allele counts, and vectors of loci coordinates with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
-                if int_new_loci_count < int_window_size
-                    ### If the new and old windows overlap as expected with sliding windows, then update the "mat_int_window_counts" according to the extent of the overlap
-                    mat_int_ALLELE_COUNTS[1:(end-(int_allele_count*int_new_loci_count)), :] = mat_int_ALLELE_COUNTS[((int_allele_count*int_new_loci_count)+1):end, :]
-                    mat_int_ALLELE_COUNTS[((end-(int_allele_count*int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=int_allele_count), :]
-                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(int_new_loci_count+1):end]
-                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[((end-int_new_loci_count)+1):end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add]
-                    vec_int_POSITION[1:(end-int_new_loci_count)] = vec_int_POSITION[(int_new_loci_count+1):end]
-                    vec_int_POSITION[((end-int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
-                else
-                    ### If the old and new windows do not overlap, i.e. when "mat_int_window_counts" loci were skipped because of too much missing data which rendered imputation impossible,
-                    ### then replace the matrix of allele counts, and vectors of loci coordinates with the new loci
-                    mat_int_ALLELE_COUNTS[1:end,:] = mat_int_window_counts
-                    vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:end] = vec_str_name_of_chromosome_or_scaffold
-                    vec_int_POSITION[1:end] = vec_int_position
-                end
+                # ### Update the matrix of allele counts, and vectors of loci coordinates with the new loci keeping the size constant by removing the loci out of the window and adding the new loci entering the window
+                # if int_new_loci_count < int_window_size
+                #     ### If the new and old windows overlap as expected with sliding windows, then update the "mat_int_window_counts" according to the extent of the overlap
+                #     mat_int_ALLELE_COUNTS[1:(end-(int_allele_count*int_new_loci_count)), :] = mat_int_ALLELE_COUNTS[((int_allele_count*int_new_loci_count)+1):end, :]
+                #     mat_int_ALLELE_COUNTS[((end-(int_allele_count*int_new_loci_count))+1):end, :] = mat_int_window_counts[repeat(vec_bool_idx_loci_new_loci_to_add, inner=int_allele_count), :]
+                #     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:(end-int_new_loci_count)] = vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[(int_new_loci_count+1):end]
+                #     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[((end-int_new_loci_count)+1):end] = vec_str_name_of_chromosome_or_scaffold[vec_bool_idx_loci_new_loci_to_add]
+                #     vec_int_POSITION[1:(end-int_new_loci_count)] = vec_int_POSITION[(int_new_loci_count+1):end]
+                #     vec_int_POSITION[((end-int_new_loci_count)+1):end] = vec_int_position[vec_bool_idx_loci_new_loci_to_add]
+                # else
+                #     ### If the old and new windows do not overlap, i.e. when "mat_int_window_counts" loci were skipped because of too much missing data which rendered imputation impossible,
+                #     ### then replace the matrix of allele counts, and vectors of loci coordinates with the new loci
+                #     mat_int_ALLELE_COUNTS[1:end,:] = mat_int_window_counts
+                #     vec_str_NAME_OF_CHROMOSOME_OR_SCAFFOLD[1:end] = vec_str_name_of_chromosome_or_scaffold
+                #     vec_int_POSITION[1:end] = vec_int_position
+                # end
                 ### If we reach the end of the file offset by one window then save the last window
                 if int_start_locus == ((int_total_loci-int_window_size) + 1)
                     ### save trailing window
