@@ -1,13 +1,11 @@
 using Random
 using ProgressMeter
-using LinearAlgebra ### Load linear algebra library for the Moore-Penrose pseudoinverse if the automatic solver fails
-using MultivariateStats
-using Lasso
 using GLMNet
 
 ### FORMATTING CONVENTION
 ### (1) variable names: snake_case
-### (2) structure names: cameCase
+### (2) structure names: CamelCase
+### (3) function names: SCREAMING
 
 struct PileupLine
     index::Int      ### line number
@@ -34,11 +32,7 @@ mutable struct Window
     pos::Vector{Int}    ### vector of positions
     ref::Vector{Char}   ### vector of reference alleles
     cou::Matrix{Any}    ### n (window size*number of alleles) rows x p (number of pools) columns
-end
-
-struct Imputed
-    window::Window      ### window containg the loci information and the imputed and non-imputed allele counts
-    tim::Matrix{Any}    ### times vector with the same dimesions as window.cou, i.e. the number of times a data point has been imputed (Note: non-missing loci are set to nothing)
+    imp::Matrix{Int}    ### number of times a locus has been imputed (corresponds to the elements of cou)
 end
 
 function PARSE(line::PileupLine, minimum_quality=20)::LocusAlleleCounts
@@ -144,7 +138,8 @@ function PARSE(window::Vector{LocusAlleleCounts})::Window
         cou[((i-1)*7)+6, idx] = window[i].D[idx]
         cou[((i-1)*7)+7, idx] = window[i].N[idx]
     end
-    return(Window(chr, pos, ref, cou))
+    imp = zeros((n*7, p))
+    return(Window(chr, pos, ref, cou, imp))
 end
 
 function SLIDE!(window::Window; locus::LocusAlleleCounts)::Window
@@ -153,48 +148,95 @@ function SLIDE!(window::Window; locus::LocusAlleleCounts)::Window
     window.pos[1:(end-1)] = window.pos[2:end]
     window.ref[1:(end-1)] = window.ref[2:end]
     window.cou[1:(end-7), :] = window.cou[8:end, :]
+    window.imp[1:(end-7), :] = window.imp[8:end, :]
     window.chr[end] = new.chr[1]
     window.pos[end] = new.pos[1]
     window.ref[end] = new.ref[1]
     window.cou[(end-6):end, :] = new.cou[1:7, :]
+    window.imp[(end-6):end, :] = zeros(size(new.cou))
     return(window)
 end
 
-function CLONE(window::Window)::Window
-    Window(copy(window.chr),
-           copy(window.pos),
-           copy(window.ref),
-           copy(window.cou))
-end
+# function CLONE(window::Window)::Window
+#     Window(copy(window.chr),
+#            copy(window.pos),
+#            copy(window.ref),
+#            copy(window.cou),
+#            copy(window.imp))
+# end
 
-function IMPUTE(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2])
+function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance=true)::Window
     n, p = size(window.cou)
     ### Find the indices of pools with missing data.
     ### These will be used independently and iteratively as our response variables
-    idx_boo = sum(ismissing.(window.cou), dims=1)[1,:] .> 0
-    idx_int  = collect(1:p)[idx_boo]
-    ### Initialise the output window
-    imputed = CLONE(window)
+    idx_pools = sum(ismissing.(window.cou), dims=1)[1,:] .> 0
     ### If we have at least one pool with no missing data, then we proceed with imputation
-    if sum(.!idx_boo) >= 1
+    if sum(.!idx_pools) >= 1
         ### Impute per pool with missing data
-        X = Int.(window.cou[:, .!vec_bool])
-        for j in idx_int
-            # j = idx_int[1]
+        X = Int.(window.cou[:, .!idx_pools])
+        for j in collect(1:p)[idx_pools]
+            # j = collect(1:p)[idx_pools][1]
             y = window.cou[:, j]
-            idx = ismissing.(y)
-            y_train = y[.!idx]
-            ### Insert modeling algorithms...
+            idx_loci = ismissing.(y)
+            y_train = Int.(y[.!idx_loci])
+            X_train = X[.!idx_loci, :]
+            nf, pf = size(X_train)
+            # ### Distance covariate (only add if the window is within a single chromosome)
+            # if distance & (length(unique(window.chr))==1)
+            #     pos = window.pos[reshape(.!idx_loci, (7, length(window.pos)))[1,:]]
+            #     m = length(pos)
+            #     Z = zeros(Int, m, m)
+            #     for i in 1:m
+            #         for j in 1:m
+            #             Z[i,j] = abs(pos[i] - pos[j])
+            #         end
+            #     end
+            #     X_train = hcat(X_train, repeat(Z, inner=(7,1)))
+            # end
+
+            ### Train models
+            if model == "Mean"
+                B = repeat([1/pf], pf)
+            elseif model == "OLS"
+                B = try
+                    X_train \ y_train
+                catch
+                    missing
+                end
+            elseif (model == "RR") | (model == "LASSO") | (model == "GLMNET")
+                model=="RR" ? alpha=0 : model=="LASSO" ? alpha=1 : alpha=0.5
+                B = try
+                    try
+                        GLMNet.coef(GLMNet.glmnetcv(X, y, alpha=alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
+                    catch
+                        GLMNet.coef(GLMNet.glmnetcv(X, y, alpha=alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
+                    end
+                catch
+                    B = missing
+                end
+            end
+
+            ### Impute
+            if !ismissing(B)
+                X_valid = X[idx_loci, :]
+                y_imputed = Int.(round.(X_valid * B))
+                y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
+                window.cou[idx_loci, j] = y_imputed
+                window.imp[idx_loci, j] .+= 1
+            end
         end
     else
         ### If don't have a single pool with no missing data, then we return the input window without imputing
         nothing
     end
+    return(window)
 end
 
 ### Test
 fname = "/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/test-SIMULATED_MISSING.pileup"
 window_size = 20
+model = "Mean"
+distance = false
 
 FILE = open(fname, "r")
 i = 0
@@ -213,6 +255,7 @@ while !eof(FILE)
         end
         window = PARSE(window)
     end
+    IMPUTE!(window, model=model, distance=distance)
     SLIDE!(window, locus=locus)
 end
 close(FILE)
