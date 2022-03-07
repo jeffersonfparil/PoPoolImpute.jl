@@ -28,14 +28,20 @@ struct LocusAlleleCounts
     N::Vector{Int}      ### counts per pool of the N allele (missing)
 end
 
-struct Window
+### Note that this Window struct does not really even need the mutable keyword since its matrix and vector componenets are mutable it seems
+mutable struct Window
     chr::Vector{String} ### vector of chromosome names
     pos::Vector{Int}    ### vector of positions
     ref::Vector{Char}   ### vector of reference alleles
     cou::Matrix{Any}    ### n (window size*number of alleles) rows x p (number of pools) columns
 end
 
-function PARSE(line::PileupLine, minimum_quality=20)
+struct Imputed
+    window::Window      ### window containg the loci information and the imputed and non-imputed allele counts
+    tim::Matrix{Any}    ### times vector with the same dimesions as window.cou, i.e. the number of times a data point has been imputed (Note: non-missing loci are set to nothing)
+end
+
+function PARSE(line::PileupLine, minimum_quality=20)::LocusAlleleCounts
     lin = split(line.line, '\t')
     chr = lin[1]
     pos = parse(Int, lin[2])
@@ -118,7 +124,7 @@ function PARSE(line::PileupLine, minimum_quality=20)
     return(LocusAlleleCounts(chr, pos, ref, dep, A, T, C, G, I, D, N))
 end
 
-function PARSE(window::Vector{LocusAlleleCounts})
+function PARSE(window::Vector{LocusAlleleCounts})::Window
     n = length(window)
     p = length(window[1].dep)
     chr = []
@@ -139,6 +145,51 @@ function PARSE(window::Vector{LocusAlleleCounts})
         cou[((i-1)*7)+7, idx] = window[i].N[idx]
     end
     return(Window(chr, pos, ref, cou))
+end
+
+function SLIDE!(window::Window; locus::LocusAlleleCounts)::Window
+    new = PARSE([locus])
+    window.chr[1:(end-1)] = window.chr[2:end]
+    window.pos[1:(end-1)] = window.pos[2:end]
+    window.ref[1:(end-1)] = window.ref[2:end]
+    window.cou[1:(end-7), :] = window.cou[8:end, :]
+    window.chr[end] = new.chr[1]
+    window.pos[end] = new.pos[1]
+    window.ref[end] = new.ref[1]
+    window.cou[(end-6):end, :] = new.cou[1:7, :]
+    return(window)
+end
+
+function CLONE(window::Window)::Window
+    Window(copy(window.chr),
+           copy(window.pos),
+           copy(window.ref),
+           copy(window.cou))
+end
+
+function IMPUTE(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2])
+    n, p = size(window.cou)
+    ### Find the indices of pools with missing data.
+    ### These will be used independently and iteratively as our response variables
+    idx_boo = sum(ismissing.(window.cou), dims=1)[1,:] .> 0
+    idx_int  = collect(1:p)[idx_boo]
+    ### Initialise the output window
+    imputed = CLONE(window)
+    ### If we have at least one pool with no missing data, then we proceed with imputation
+    if sum(.!idx_boo) >= 1
+        ### Impute per pool with missing data
+        X = Int.(window.cou[:, .!vec_bool])
+        for j in idx_int
+            # j = idx_int[1]
+            y = window.cou[:, j]
+            idx = ismissing.(y)
+            y_train = y[.!idx]
+            ### Insert modeling algorithms...
+        end
+    else
+        ### If don't have a single pool with no missing data, then we return the input window without imputing
+        nothing
+    end
 end
 
 ### Test
@@ -162,5 +213,6 @@ while !eof(FILE)
         end
         window = PARSE(window)
     end
+    SLIDE!(window, locus=locus)
 end
 close(FILE)
