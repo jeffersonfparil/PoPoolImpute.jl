@@ -2,6 +2,7 @@ using Random
 using ProgressMeter
 using GLMNet
 using MultivariateStats
+using UnicodePlots
 
 ### FORMATTING CONVENTION
 ### (1) variable names: snake_case
@@ -147,15 +148,6 @@ function PARSE(window::Vector{LocusAlleleCounts})::Window
     return(Window(chr, pos, ref, cou, imp))
 end
 
-function PARSE(filename::String)::String
-    file = open(filename, "r")
-    filename_output = string(join(split(filename, '.')[1:(end-1)], '.'), ".syncx")
-    while !eof(file)
-        SAVE(PARSE([PARSE(PileupLine(1, readline(file)))]), filename_output)
-    end
-    return(filename_output)
-end
-
 function EXTRACT(window::Window, locus::Int)::Window
     Window([window.chr[locus]],
            [window.pos[locus]],
@@ -261,6 +253,7 @@ function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][
     return(window)
 end
 
+### I/O
 function SAVE(window::Window, filename::String)
     OUT = hcat(repeat(window.chr, inner=7),
                repeat(window.pos, inner=7),
@@ -268,6 +261,60 @@ function SAVE(window::Window, filename::String)
     out = join([join(x,',') for x in eachrow(OUT)], '\n')
     file = open(filename, "a")
     write(file, string(out, '\n'))
+    close(file)
+end
+
+function PILEUP2SYNCX(filename::String)::String
+    file = open(filename, "r")
+    filename_output = string(join(split(filename, '.')[1:(end-1)], '.'), ".syncx")
+    while !eof(file)
+        SAVE(PARSE([PARSE(PileupLine(1, readline(file)))]), filename_output)
+    end
+    return(filename_output)
+end
+
+function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)
+    file = open(filename, "r")
+    c1 = 0; c2 = 0
+    i1 = 0; i2 = (lines_per_chunk+window_size+1)
+
+    while !eof(file)
+        line = string(readline(file), "\n");
+        ### initialise chunk file
+        if i1 == 0
+            c1 = c2 + 1
+            global out1 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", c1, ".pileup"), "w")
+        end
+        if i2 == 0
+            c2 = c1 + 1
+            global out2 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", c2, ".pileup"), "w")
+        end
+        ### write into chunk file
+        if i1 < (lines_per_chunk+window_size)
+            i1 += 1
+            write(out1, line)
+        end
+        if i2 < (lines_per_chunk+window_size)
+            i2 += 1
+            write(out2, line)
+        end
+        ### close chunk file
+        if i1 == (lines_per_chunk+window_size)
+            i1 += 1
+            close(out1)
+        end
+        if i2 == (lines_per_chunk+window_size)
+            i2 += 1
+            close(out2)
+        end
+        ### reset chunk size
+        if i1 == lines_per_chunk
+            i2 = 0
+        end
+        if i2 == lines_per_chunk
+            i1 = 0
+        end
+    end
     close(file)
 end
 
@@ -280,6 +327,49 @@ function CLONE(window::Window)::Window
            copy(window.imp))
 end
 
+function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed; plot=false, rmse=false, save=false, csv_out="")
+    # syncx_without_missing = "test.syncx"
+    # syncx_with_missing = "test-SIMULATED_MISSING.syncx"
+    # syncx_imputed = "test-IMPUTED.syncx"
+    ### We should have the same exact locus corresponding per row across these three files
+    file_without_missing = open(syncx_without_missing, "r")
+    file_with_missing    = open(syncx_with_missing, "r")
+    file_imputed         = open(syncx_imputed, "r")
+    expected = []
+    imputed = []
+    while !eof(file_without_missing)
+        c = split(readline(file_without_missing), ',')
+        m = split(readline(file_with_missing), ',')
+        i = split(readline(file_imputed), ',')
+        idx = m .== "missing"
+        c = parse.(Int, c[idx])
+        i = parse.(Int, i[idx])
+        append!(expected, c)
+        append!(imputed, i)
+    end
+    close(file_without_missing)
+    close(file_with_missing)
+    close(file_imputed)
+
+    if plot
+        @show UnicodePlots.scatterplot(Int.(expected), Int.(imputed))
+    end
+    if rmse
+        RMSE = sqrt(sum((expected .- imputed).^2)/length(expected))
+        println(string("RMSE = ", RMSE))
+    end
+    if save
+        if csv_out == ""
+            csv_out = string("Imputation_cross_validation_output-", time(), ".csv")
+        end
+        file_out = open(csv_out, "w")
+        for i in 1:length(expected)
+            write(file_out, string(expected[i], ",", imputed[i], "\n"))
+        end
+        close(file_out)
+    end
+    return(expected, imputed)
+end
 
 ### Test
 pileup_with_missing = "/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/test-SIMULATED_MISSING.pileup"
@@ -316,42 +406,17 @@ end
 close(file)
 SAVE(EXTRACT(window, 2:window_size), syncx_imputed)
 
-@time syncx_without_missing = PARSE(pileup_without_missing)
+@time syncx_without_missing = PILEUP2SYNCX(pileup_without_missing)
 
-@time syncx_with_missing = PARSE(pileup_with_missing)
+@time syncx_with_missing = PILEUP2SYNCX(pileup_with_missing)
 
-function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed)
-    # syncx_without_missing = "test.syncx"
-    # syncx_with_missing = "test-SIMULATED_MISSING.syncx"
-    # syncx_imputed = "test-IMPUTED.syncx"
-    ### We should have the same exact locus corresponding per row across these three files
-    file_without_missing = open(syncx_without_missing, "r")
-    file_with_missing    = open(syncx_with_missing, "r")
-    file_imputed         = open(syncx_imputed, "r")
-    expected = []
-    imputed = []
-    while !eof(file_without_missing)
-        c = split(readline(file_without_missing), ',')
-        m = split(readline(file_with_missing), ',')
-        i = split(readline(file_imputed), ',')
-        idx = m .== "missing"
-        c = parse.(Int, c[idx])
-        i = parse.(Int, i[idx])
-        append!(expected, c)
-        append!(imputed, i)
-    end
-    close(file_without_missing)
-    close(file_with_missing)
-    close(file_imputed)
-    return(expected, imputed)
-end
+expected, imputed = CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
 
-using UnicodePlots
-
-expected, imputed = CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed)
-
-UnicodePlots.scatterplot(Int.(expected), Int.(imputed))
-
+### clean-up
 for f in [syncx_without_missing, syncx_with_missing, syncx_imputed]
     rm(f)
 end
+
+### Split input file for parallel processing
+@time SPLIT("test-SIMULATED_MISSING.pileup", 20, 5)
+
