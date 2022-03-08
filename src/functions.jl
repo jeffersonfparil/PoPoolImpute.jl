@@ -1,6 +1,7 @@
 using Random
 using ProgressMeter
 using GLMNet
+using MultivariateStats
 
 ### FORMATTING CONVENTION
 ### (1) variable names: snake_case
@@ -58,11 +59,15 @@ function PARSE(line::PileupLine, minimum_quality=20)::LocusAlleleCounts
             # println(string("k=", k))
             
             ### allele read qualities
-            if vec_qua_per_pool[k][1] != '*'
-                q = Int(vec_qua_per_pool[k][1]) - 33
-            else 
-                q = 0
-            end
+            q = try
+                    if vec_qua_per_pool[k][1] != '*'
+                        Int(vec_qua_per_pool[k][1]) - 33
+                    else 
+                        q = 0
+                    end
+                catch
+                    nothing
+                end
 
             ### allele states
             str_state = uppercase(vec_sta_per_pool[j])
@@ -73,7 +78,7 @@ function PARSE(line::PileupLine, minimum_quality=20)::LocusAlleleCounts
                     q>=minimum_quality ? I[i] += 1 : nothing
                 else
                     # push!(s, 'D')
-                    q>=minimum_quality ? D[i] += 1 : nothing
+                    D[i] += 1 ### no need to test for quality because the allele is deleted
                     k -= 1
                 end
                 l = 1
@@ -142,6 +147,31 @@ function PARSE(window::Vector{LocusAlleleCounts})::Window
     return(Window(chr, pos, ref, cou, imp))
 end
 
+function PARSE(filename::String)::String
+    file = open(filename, "r")
+    filename_output = string(join(split(filename, '.')[1:(end-1)], '.'), ".syncx")
+    while !eof(file)
+        SAVE(PARSE([PARSE(PileupLine(1, readline(file)))]), filename_output)
+    end
+    return(filename_output)
+end
+
+function EXTRACT(window::Window, locus::Int)::Window
+    Window([window.chr[locus]],
+           [window.pos[locus]],
+           [window.ref[locus]],
+           window.cou[(7*(locus-1))+1:(locus*7), :],
+           window.imp[(7*(locus-1))+1:(locus*7), :])
+end
+
+function EXTRACT(window::Window, loci::UnitRange{Int})::Window
+    Window(window.chr[loci],
+           window.pos[loci],
+           window.ref[loci],
+           window.cou[(7*(loci.start-1))+1:(loci.stop*7), :],
+           window.imp[(7*(loci.start-1))+1:(loci.stop*7), :])
+end
+
 function SLIDE!(window::Window; locus::LocusAlleleCounts)::Window
     new = PARSE([locus])
     window.chr[1:(end-1)] = window.chr[2:end]
@@ -157,14 +187,6 @@ function SLIDE!(window::Window; locus::LocusAlleleCounts)::Window
     return(window)
 end
 
-# function CLONE(window::Window)::Window
-#     Window(copy(window.chr),
-#            copy(window.pos),
-#            copy(window.ref),
-#            copy(window.cou),
-#            copy(window.imp))
-# end
-
 function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance=true)::Window
     n, p = size(window.cou)
     ### Find the indices of pools with missing data.
@@ -172,8 +194,22 @@ function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][
     idx_pools = sum(ismissing.(window.cou), dims=1)[1,:] .> 0
     ### If we have at least one pool with no missing data, then we proceed with imputation
     if sum(.!idx_pools) >= 1
-        ### Impute per pool with missing data
+        ### Explanatory variables
         X = Int.(window.cou[:, .!idx_pools])
+
+         ### Distance covariate (only add if the window is within a single chromosome)
+         if distance & (length(unique(window.chr))==1)
+            m = length(window.pos)
+            D = zeros(Int, m, m)
+            for i in 1:m
+                for j in 1:m
+                    D[i,j] = abs(window.pos[i] - window.pos[j])
+                end
+            end
+            Z = MultivariateStats.projection(MultivariateStats.fit(PCA, repeat(D, inner=(7,1)); maxoutdim=3)) ### using the first 3 PCs by default
+            X = hcat(X, Z)
+        end
+
         for j in collect(1:p)[idx_pools]
             # j = collect(1:p)[idx_pools][1]
             y = window.cou[:, j]
@@ -181,47 +217,40 @@ function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][
             y_train = Int.(y[.!idx_loci])
             X_train = X[.!idx_loci, :]
             nf, pf = size(X_train)
-            # ### Distance covariate (only add if the window is within a single chromosome)
-            # if distance & (length(unique(window.chr))==1)
-            #     pos = window.pos[reshape(.!idx_loci, (7, length(window.pos)))[1,:]]
-            #     m = length(pos)
-            #     Z = zeros(Int, m, m)
-            #     for i in 1:m
-            #         for j in 1:m
-            #             Z[i,j] = abs(pos[i] - pos[j])
-            #         end
-            #     end
-            #     X_train = hcat(X_train, repeat(Z, inner=(7,1)))
-            # end
-
+           
             ### Train models
             if model == "Mean"
-                B = repeat([1/pf], pf)
+                β = append!([0.0], repeat([1/pf], pf))
             elseif model == "OLS"
-                B = try
-                    X_train \ y_train
+                β = try
+                    hcat(ones(nf), X_train) \ y_train
                 catch
                     missing
                 end
             elseif (model == "RR") | (model == "LASSO") | (model == "GLMNET")
                 model=="RR" ? alpha=0 : model=="LASSO" ? alpha=1 : alpha=0.5
-                B = try
+                β = try
                     try
-                        GLMNet.coef(GLMNet.glmnetcv(X, y, alpha=alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
+                        GLMNet.coef(GLMNet.glmnetcv(hcat(ones(nf), X_train), y_train, alpha=alpha, tol=1e-7)) # equivalend to mod.path.betas[:, argmin(mod)]
                     catch
-                        GLMNet.coef(GLMNet.glmnetcv(X, y, alpha=alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
+                        GLMNet.coef(GLMNet.glmnetcv(hcat(ones(nf), X_train), y_train, alpha=alpha, tol=1e-3)) # equivalend to mod.path.betas[:, argmin(mod)]
                     end
                 catch
-                    B = missing
+                    β = missing
                 end
             end
 
             ### Impute
-            if !ismissing(B)
+            if !ismissing(β)
                 X_valid = X[idx_loci, :]
-                y_imputed = Int.(round.(X_valid * B))
-                y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
-                window.cou[idx_loci, j] = y_imputed
+                y_imputed = Int.(round.(hcat(ones(sum(idx_loci)), X_valid) * β))
+                # y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
+                y_imputed .-= minimum(y_imputed)
+
+                y_imputed_mean = append!([], ((window.cou[idx_loci, j] .* window.imp[idx_loci, j]) .+ y_imputed) ./ (window.imp[idx_loci, j] .+ 1))
+                y_imputed_mean[ismissing.(y_imputed_mean)] = y_imputed
+
+                window.cou[idx_loci, j] = Int.(round.(y_imputed_mean))
                 window.imp[idx_loci, j] .+= 1
             end
         end
@@ -232,30 +261,97 @@ function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][
     return(window)
 end
 
-### Test
-fname = "/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/test-SIMULATED_MISSING.pileup"
-window_size = 20
-model = "Mean"
-distance = false
+function SAVE(window::Window, filename::String)
+    OUT = hcat(repeat(window.chr, inner=7),
+               repeat(window.pos, inner=7),
+               window.cou)
+    out = join([join(x,',') for x in eachrow(OUT)], '\n')
+    file = open(filename, "a")
+    write(file, string(out, '\n'))
+    close(file)
+end
 
-FILE = open(fname, "r")
+### MISC
+function CLONE(window::Window)::Window
+    Window(copy(window.chr),
+           copy(window.pos),
+           copy(window.ref),
+           copy(window.cou),
+           copy(window.imp))
+end
+
+
+### Test
+pileup_with_missing = "/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/test-SIMULATED_MISSING.pileup"
+window_size = 20
+model = "LASSO"
+distance = true
+syncx_imputed = "test-IMPUTED.syncx"
+pileup_without_missing = "test.pileup"
+
+
+file = open(pileup_with_missing, "r")
 i = 0
-window = nothing
-while !eof(FILE)
-    i += 1
-    line = PileupLine(i, readline(FILE));
-    locus = PARSE(line)
-    if window == nothing
-        window = [locus]
+window = []
+@time while !eof(file)
+    println(i)
+    if window == []
         while i < window_size
             i += 1
-            line = PileupLine(i, readline(FILE));
+            line = PileupLine(i, readline(file));
             locus = PARSE(line)
             push!(window, locus)
         end
-        window = PARSE(window)
+        window = PARSE(Array{LocusAlleleCounts}(window))
+        IMPUTE!(window, model=model, distance=distance)
+        SAVE(EXTRACT(window, 1), syncx_imputed)
     end
-    IMPUTE!(window, model=model, distance=distance)
+    i += 1
+    line = PileupLine(i, readline(file));
+    locus = PARSE(line)
     SLIDE!(window, locus=locus)
+    IMPUTE!(window, model=model, distance=distance)
+    SAVE(EXTRACT(window, 1), syncx_imputed)
 end
-close(FILE)
+close(file)
+SAVE(EXTRACT(window, 2:window_size), syncx_imputed)
+
+@time syncx_without_missing = PARSE(pileup_without_missing)
+
+@time syncx_with_missing = PARSE(pileup_with_missing)
+
+function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed)
+    # syncx_without_missing = "test.syncx"
+    # syncx_with_missing = "test-SIMULATED_MISSING.syncx"
+    # syncx_imputed = "test-IMPUTED.syncx"
+    ### We should have the same exact locus corresponding per row across these three files
+    file_without_missing = open(syncx_without_missing, "r")
+    file_with_missing    = open(syncx_with_missing, "r")
+    file_imputed         = open(syncx_imputed, "r")
+    expected = []
+    imputed = []
+    while !eof(file_without_missing)
+        c = split(readline(file_without_missing), ',')
+        m = split(readline(file_with_missing), ',')
+        i = split(readline(file_imputed), ',')
+        idx = m .== "missing"
+        c = parse.(Int, c[idx])
+        i = parse.(Int, i[idx])
+        append!(expected, c)
+        append!(imputed, i)
+    end
+    close(file_without_missing)
+    close(file_with_missing)
+    close(file_imputed)
+    return(expected, imputed)
+end
+
+using UnicodePlots
+
+expected, imputed = CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed)
+
+UnicodePlots.scatterplot(Int.(expected), Int.(imputed))
+
+for f in [syncx_without_missing, syncx_with_missing, syncx_imputed]
+    rm(f)
+end
