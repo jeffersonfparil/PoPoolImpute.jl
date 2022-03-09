@@ -42,3 +42,4 @@ end
 for f in files[match.(Regex("Imputation_cross_validation_output-"), files) .!= nothing]
     rm(f)
 end
+rm(pileup_without_missing)
