@@ -15,10 +15,11 @@ pileup_without_missing = "test.pileup"
 # pileup_with_missing = "test-SIMULATED_MISSING.pileup"
 pileup_with_missing = PoPoolImpute.functions.fun_simulate_missing(pileup_without_missing,
                                                                   int_sequencing_read_length=10,
-@time syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
-@time syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
                                                                   flt_maximum_fraction_of_loci_with_missing=0.50,
                                                                   flt_maximum_fraction_of_pools_with_missing=0.25)
+@time syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
+@time syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
+
 for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
     syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
                                         window_size=20,
@@ -31,14 +32,15 @@ for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
 
 rm(syncx_imputed)
 
+end 
+
+### clean-up
+for f in [pileup_with_missing, syncx_without_missing, syncx_with_missing]
+ rm(f)
+end 
+
     ### Remove cross-validation output
     files = readdir()
     for f in files[match.(Regex("Imputation_cross_validation_output-"), files) .!= nothing]
-        rm(f)
-    end
-end 
-
-    ### clean-up
-    for f in [pileup_with_missing, syncx_without_missing, syncx_with_missing]
         rm(f)
     end
