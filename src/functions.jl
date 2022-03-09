@@ -1,13 +1,14 @@
-using Random
-using ProgressMeter
-using GLMNet
-using MultivariateStats
-using UnicodePlots
-
 ### FORMATTING CONVENTION
 ### (1) variable names: snake_case
 ### (2) structure names: CamelCase
 ### (3) function names: SCREAMING
+module functions
+
+using GLMNet
+using MultivariateStats
+using UnicodePlots
+using Random
+using ProgressMeter
 
 struct PileupLine
     index::Int      ### line number
@@ -179,7 +180,7 @@ function SLIDE!(window::Window; locus::LocusAlleleCounts)::Window
     return(window)
 end
 
-function IMPUTE!(window::Window; model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance=true)::Window
+function IMPUTE!(window::Window; model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true)::Window
     n, p = size(window.cou)
     ### Find the indices of pools with missing data.
     ### These will be used independently and iteratively as our response variables
@@ -273,7 +274,7 @@ function PILEUP2SYNCX(filename::String)::String
     return(filename_output)
 end
 
-function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)
+function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector{String}
     file = open(filename, "r")
     c1 = 0; c2 = 0
     i1 = 0; i2 = (lines_per_chunk+window_size+1)
@@ -316,6 +317,32 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)
         end
     end
     close(file)
+    ### Remove tailing files with size less than or equal to the window size
+    dir = if dirname(filename) == ""
+            "."
+        else 
+            dirname(filename)
+        end
+    ls = readdir(dir)
+    ls = ls[match.(Regex(join(split(basename(filename), ".")[1:(end-1)], ".")), ls) .!= nothing]
+    ls = ls[match.(Regex("CHUNK"), ls) .!= nothing]
+    ls = ls[match.(Regex("pileup"), ls) .!= nothing]
+    for f in ls
+        i = 0
+        file = open(f, "r")
+        while !eof(file)
+            _ = readline(file)
+            i += 1
+        end
+        close(file)
+        if i <= window_size
+            rm(f)
+            ls = ls[ls .!= f]
+        end
+    end
+    ### It is important to have the full path of the chunks since @distributed tasks reverts the working directory to default, i.e. the location where julia was called
+    ls = string.(dirname(filename), "/", ls)
+    return(ls)
 end
 
 ### MISC
@@ -331,92 +358,203 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     # syncx_without_missing = "test.syncx"
     # syncx_with_missing = "test-SIMULATED_MISSING.syncx"
     # syncx_imputed = "test-IMPUTED.syncx"
-    ### We should have the same exact locus corresponding per row across these three files
+    ### NOTE: we should have the same exact locus corresponding per row across these three files
+    ### Pools (list of pool indices including the first 2 columns: chr and pos but we need not worry since these won't ever be missing)
+    file = open(syncx_without_missing, "r")
+    p = collect(1:length(split(readline(file), ',')))
+    close(file)
+    ### extract expected and imputed allele counts
     file_without_missing = open(syncx_without_missing, "r")
     file_with_missing    = open(syncx_with_missing, "r")
     file_imputed         = open(syncx_imputed, "r")
     expected = []
     imputed = []
+    pool = []
+    ### TODO: ADD UNIMPUTED DATAPOINTS COUNTER
     while !eof(file_without_missing)
         c = split(readline(file_without_missing), ',')
         m = split(readline(file_with_missing), ',')
         i = split(readline(file_imputed), ',')
         idx = m .== "missing"
         c = parse.(Int, c[idx])
-        i = parse.(Int, i[idx])
-        append!(expected, c)
-        append!(imputed, i)
+        i = try
+                parse.(Int, i[idx])
+            catch
+                missing
+            end
+        if !ismissing(i)
+            append!(expected, c)
+            append!(imputed, i)
+            append!(pool, p[idx])
+        end
     end
     close(file_without_missing)
     close(file_with_missing)
     close(file_imputed)
-
+    ### calculate allele frequencies
+    expected_freq = []
+    imputed_freq = []
+    for i in pool
+        idx = pool .== i
+        X = reshape(expected[idx], (7, Int(sum(idx)/7)))
+        append!(expected_freq, reshape(X ./ sum(X, dims=1), (length(X), )))
+        X = reshape(imputed[idx], (7, Int(sum(idx)/7)))
+        append!(imputed_freq, reshape(X ./ sum(X, dims=1), (length(X), )))
+    end
+    ### plot
     if plot
-        @show UnicodePlots.scatterplot(Int.(expected), Int.(imputed))
+        plot1 = UnicodePlots.scatterplot(Int.(expected), Int.(imputed),
+                                         title="Counts",
+                                         grid=true, color=:white, canvas=BlockCanvas)
+        plot2 = UnicodePlots.scatterplot(Float64.(expected_freq), Float64.(imputed_freq),
+                                         title="Frequencies",
+                                         grid=true, color=:white, canvas=BlockCanvas)
+        @show plot1
+        @show plot2
     end
+    ### Root mean square error
     if rmse
-        RMSE = sqrt(sum((expected .- imputed).^2)/length(expected))
-        println(string("RMSE = ", RMSE))
+        RMSE_count = sqrt(sum((expected .- imputed).^2)/length(expected))
+        RMSE_freq = sqrt(sum((expected_freq .- imputed_freq).^2)/length(expected_freq))
+        println(string("RMSE_count = ", round(RMSE_count, digits=4)))
+        println(string("RMSE_freq = ", round(RMSE_freq, digits=4)))
     end
+    ### save expected and imputed counts and frequencies
     if save
         if csv_out == ""
             csv_out = string("Imputation_cross_validation_output-", time(), ".csv")
         end
         file_out = open(csv_out, "w")
         for i in 1:length(expected)
-            write(file_out, string(expected[i], ",", imputed[i], "\n"))
+            write(file_out, string(join([expected[i], imputed[i], expected_freq[i], imputed_freq[i]], ','), "\n"))
         end
         close(file_out)
     end
-    return(expected, imputed)
+    return(expected, imputed, expected_freq, imputed_freq)
 end
 
-### Test
-pileup_with_missing = "/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/test-SIMULATED_MISSING.pileup"
-window_size = 20
-model = "LASSO"
-distance = true
-syncx_imputed = "test-IMPUTED.syncx"
-pileup_without_missing = "test.pileup"
-
-
-file = open(pileup_with_missing, "r")
-i = 0
-window = []
-@time while !eof(file)
-    println(i)
-    if window == []
-        while i < window_size
-            i += 1
-            line = PileupLine(i, readline(file));
-            locus = PARSE(line)
-            push!(window, locus)
+function fun_simulate_missing(str_filename_pileup; int_sequencing_read_length=100, flt_maximum_fraction_of_loci_with_missing=0.50, flt_maximum_fraction_of_pools_with_missing=0.25, str_filename_pileup_simulated_missing=".")
+    ###########################################################
+    ### TEST
+    # str_filename_pileup = "/data-weedomics-1/test_human.pileup"
+    # int_sequencing_read_length = 150
+    # flt_maximum_fraction_of_loci_with_missing = 0.50
+    # flt_maximum_fraction_of_pools_with_missing = 0.25
+    ###########################################################
+    if str_filename_pileup_simulated_missing=="."
+        str_filename_pileup_simulated_missing = string(join(split(str_filename_pileup, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
+    end
+    println("Counting lines.")
+    @show int_loci_count = countlines(str_filename_pileup)
+    println("Counting pools.")
+    file_temp = open(str_filename_pileup, "r")
+    i = -1
+    if i <0
+        i += 1
+        line = readline(file_temp)
+    end
+    close(file_temp)
+    @show int_pool_count = Int((length(split(line, '\t')) - 3) / 3)
+    println("Randomly sampling loci chunks to set to missing.")
+    int_chunk_count = Int(ceil(int_loci_count / int_sequencing_read_length))
+    println("Counting the number of loci and pool which will be set to missing.")
+    @show int_missing_loci_count = Int(round(int_chunk_count*flt_maximum_fraction_of_loci_with_missing))
+    @show int_missing_pool_count = Int(round(int_pool_count*flt_maximum_fraction_of_pools_with_missing))
+    ### Proceed if we will be simulating at least 1 missing datapoint
+    if int_missing_loci_count*int_missing_pool_count > 0
+        println("Randomly sample chunks of loci which will be set to missing.")
+        vec_int_random_chunk = sort(randperm(int_chunk_count)[1:int_missing_loci_count])
+        vec_int_random_chunk = ((vec_int_random_chunk .- 1) .* int_sequencing_read_length) .+ 1
+        println("Open input and output files, and initialise the iterators")
+        FILE = open(str_filename_pileup, "r")
+        file_out = open(str_filename_pileup_simulated_missing, "w")
+        i = 0
+        j = 1
+        println("Simulate missing data.")
+        pb = ProgressMeter.Progress(int_loci_count, i)
+        while !eof(FILE)
+            i += 1; ProgressMeter.next!(pb)
+            line = readline(FILE)
+            ### while-looping to properly deal with the last read line
+            while i == vec_int_random_chunk[j]
+                ### if we reach the last missing chunk, then stop incrementing
+                length(vec_int_random_chunk) == j ? j : j += 1
+                ### parse the tab-delimited line
+                vec_str_line = split(line, '\t')
+                ### extract the scaffold or chromosome name
+                str_scaffold_or_chromosome = vec_str_line[1]
+                ### randomly choose pools to get missing data
+                vec_idx_pool_rand_missing = randperm(int_pool_count)[1:int_missing_pool_count]
+                vec_idx_pool_rand_missing = (((vec_idx_pool_rand_missing .- 1) .* 3) .+ 1) .+ 3
+                int_position_ini = parse(Int, vec_str_line[2])
+                int_position_end = int_position_ini + (int_sequencing_read_length - 1) ### less initial position twice since we're counting the initial position as part of the read length and we've already written it before the forst iteration of the while-loop
+                while (str_scaffold_or_chromosome == vec_str_line[1]) & (parse(Int, vec_str_line[2]) <= int_position_end) & !eof(FILE)
+                    ### Set to missing each of the randomly sampled pools in the current locus
+                    for k in vec_idx_pool_rand_missing
+                        vec_str_line[k:k+2] = ["0", "*", "*"]
+                    end
+                    ### Write-out the line with simulated missing data
+                    line = join(vec_str_line, '\t')
+                    write(file_out, string(line, '\n'))
+                    i += 1; ProgressMeter.next!(pb)
+                    line = readline(FILE)
+                    vec_str_line = split(line, '\t')
+                end
+            end
+            ### Write-out the line without missing data
+            write(file_out, string(line, '\n'))
         end
-        window = PARSE(Array{LocusAlleleCounts}(window))
+        close(FILE)
+        close(file_out)
+        println("##############################################################")
+        println("Missing data simulation finished! Please find the output file:")
+        println(str_filename_pileup_simulated_missing)
+        println("##############################################################")
+        return(str_filename_pileup_simulated_missing)
+    else
+        println("Did not simulate any missing data. Because the fraction of missing loci and pools parameter was too low.")
+        return(1)
+    end
+end
+
+### Main
+function IMPUTE(pileup_with_missing::String; window_size::Int=100, model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true, syncx_imputed::String="")::String
+    # pileup_with_missing = "/home/jeffersonfparil/Documents/PoPoolImpute.jl/test/test-SIMULATED_MISSING.pileup"
+    # window_size = 20
+    # model = "LASSO"
+    # distance = true
+    # syncx_imputed = "test-IMPUTED.syncx"
+    ### Output filename
+    if syncx_imputed==""
+        syncx_imputed = string(join(split(pileup_with_missing, '.')[1:(end-1)], '.'), "-IMPUTED.syncx")
+    end
+    ### Impute
+    file = open(pileup_with_missing, "r")
+    i = 0
+    window = []
+    while !eof(file)
+        if window == []
+            while i < window_size
+                i += 1
+                line = PileupLine(i, readline(file));
+                locus = PARSE(line)
+                push!(window, locus)
+            end
+            window = PARSE(Array{LocusAlleleCounts}(window))
+            IMPUTE!(window, model=model, distance=distance)
+            SAVE(EXTRACT(window, 1), syncx_imputed)
+        end
+        i += 1
+        line = PileupLine(i, readline(file));
+        locus = PARSE(line)
+        SLIDE!(window, locus=locus)
         IMPUTE!(window, model=model, distance=distance)
         SAVE(EXTRACT(window, 1), syncx_imputed)
     end
-    i += 1
-    line = PileupLine(i, readline(file));
-    locus = PARSE(line)
-    SLIDE!(window, locus=locus)
-    IMPUTE!(window, model=model, distance=distance)
-    SAVE(EXTRACT(window, 1), syncx_imputed)
-end
-close(file)
-SAVE(EXTRACT(window, 2:window_size), syncx_imputed)
-
-@time syncx_without_missing = PILEUP2SYNCX(pileup_without_missing)
-
-@time syncx_with_missing = PILEUP2SYNCX(pileup_with_missing)
-
-expected, imputed = CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
-
-### clean-up
-for f in [syncx_without_missing, syncx_with_missing, syncx_imputed]
-    rm(f)
+    close(file)
+    SAVE(EXTRACT(window, 2:window_size), syncx_imputed)
+    return(syncx_imputed)
 end
 
-### Split input file for parallel processing
-@time SPLIT("test-SIMULATED_MISSING.pileup", 20, 5)
+end
 
