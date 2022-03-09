@@ -4,13 +4,13 @@ using Random
 using Distributed
 threads = 2 ### github actions virtual machine allocated has only 2 cores
 Distributed.addprocs(threads)
-# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# @everywhere using PoPoolImpute
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+@everywhere using PoPoolImpute
 
-@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
 cd("test/")
-
+run(`tar -xvf test.pileup.tar.xz`)
 pileup_without_missing = "test.pileup"
 # pileup_with_missing = "test-SIMULATED_MISSING.pileup"
 pileup_with_missing = PoPoolImpute.functions.fun_simulate_missing(pileup_without_missing,
