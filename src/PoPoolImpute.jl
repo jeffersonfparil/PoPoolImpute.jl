@@ -5,7 +5,68 @@ using .functions: SPLIT, IMPUTE
 using Dates
 using ProgressMeter
 
-function impute(pileup_with_missing::String; window_size::Int=100, model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true, syncx_imputed::String="", threads::Int=2, lines_per_chunk::Int=10_000)::String
+### Documentation
+"""
+# ____________________________________________________________________
+# PoPoolImpute: imputation of population- and pool-level genotype data
+# Usage
+`PopPoolImpute.impute(pileup_with_missing::String; window_size::Int=100, model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true, syncx_imputed::String="", threads::Int=2, lines_per_chunk::Int=10_000)::String`
+
+# Inputs
+1. pileup_with_missing [String]: filename of input pileup file
+2. window_size [Int; default=100]: number of loci per window
+3. model [String; default="OLS"]: imputation model to use. Choose from "Mean" (average allele count), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator regression), "GLMNET" (elastic-net regression at α=0.5)
+4. distance [Bool; default=true]: use the first 3 principal components of the pairwise loci distance matrix as an additional covariate
+5. syncx_imputed [String; default=\${pileup_with_missing%.pileup*}-IMPUTED.syncx]: filename of the imputation output file
+6. threads [Int; default=1]
+7. lines_per_chunk::Int=10_000
+
+# Output
+syncx_imputed:
+Syncx format (after popoolation2's sync or synchronised pileup file format):
+- Column 1:   chromosome or scaffold name
+- Column 2:   locus position repeated 7 times corresponding to alleles "A", "T", "C", "G", "INS", "DEL", "N", where "INS" is insertion, "DEL" is deletion, and "N" is unclassified
+- Column 3-n: allele counts one column for each pool or population
+# Examples
+
+```
+# Single-threaded execution
+using PoPoolImpute
+PoPoolImpute.impute("test.pileup")
+
+# Multi-threaded execution
+using Distributed
+int_thread_count = length(Sys.cpu_info())-1
+Distributed.addprocs(int_thread_count)
+@everywhere using PoPoolImpute
+PoPoolImpute.impute("test.pileup", window_size=20, threads=2, lines_per_chunk=30)
+```
+
+# Details
+Performs a simple least squares linear regression to predict missing allele counts per window for each pool with at least one locus with missing data.
+- For each pool with missing data we estimate β̂ as:
+```
+          yₚ = Xₚβ
+        → β̂ = inverse(XₚᵀXₚ) (Xₚᵀyₚ).
+```
+
+- For each pool with missing data we, imputation is achieved by predicting the missing allele counts:
+```
+          ŷₘ = XₘB̂.
+```
+- Where:
+    + yₚ is the vector of allele counts of one of the pools with missing data at the loci without missing data (length: mₚ non-missing loci × 7 alleles);
+    + Xₚ is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: mₚ non-missing loci × 7 alleles, nₚ pools without missing loci);
+    + β̂ is the vector of estimates of the effects of each pool without missing data on the allele counts of one of the pools with missing data (length: nₚ pools without missing loci);
+    + inverse() is the Moore-Penrose pseudoinverse if the automatic Julia solver fails;
+    + ŷₘ is the vector of imputed allele counts of one of the pools with missing data (length: mₘ missing loci × 7 alleles); and
+    + Xₘ is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: mₘ non-missing loci × 7 alleles, nₚ pools without missing loci).
+The imputed allele counts are averaged across the windows sliding one locus at a time.
+# Author
+- Jeff Paril (jeffersonparil@gmail.com; https://orcid.org/0000-0002-5693-4123)
+...
+"""
+function impute(pileup_with_missing::String; window_size::Int=100, model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true, syncx_imputed::String="", threads::Int=1, lines_per_chunk::Int=10_000)::String
     ### Opening remark
     println("")
     println("####################################################################")
@@ -29,51 +90,59 @@ function impute(pileup_with_missing::String; window_size::Int=100, model::String
         syncx_imputed = string(join(split(pileup_with_missing, '.')[1:(end-1)], '.'), "-IMPUTED.syncx")
     end
     ### Define the full path to the input and output files since calling functions within @distributed loop will revert back to the root directory from where julia was executed from
-    if dirname(pileup_with_missing) == ""
+    if dirname(pileup_with_missing) != pwd()
         pileup_with_missing = string(pwd(), "/", pileup_with_missing)
     end
-    if dirname(syncx_imputed) == ""
+    if dirname(syncx_imputed) != pwd()
         syncx_imputed = string(pwd(), "/", syncx_imputed)
     end
-    ### Split input file for parallel processing if we have more than 1 core or thread available
-    filenames = [pileup_with_missing]
     if threads > 1
-        filenames = SPLIT(pileup_with_missing, lines_per_chunk, window_size)
-    end
-    ### Impute
-    @time filenames_out = @sync @showprogress @distributed (append!) for f in filenames
-        filename_imputed = IMPUTE(f, window_size=window_size, model=model, distance=distance)
-        [filename_imputed]
-    end
-    ### Trim-off overhanging windows and merge
-    file_out = open(syncx_imputed, "w")
-    for i in 1:length(filenames_out)
-        if i < length(filenames_out)
-            ### trim trailing window from the first and intervening chunks
-            lines = 0
+        ### Multi-threaded execution
+        ### Split input file for parallel processing if we have more than 1 core or thread available
+        filenames = [pileup_with_missing]
+        if threads > 1
+            filenames = SPLIT(pileup_with_missing, lines_per_chunk, window_size)
+        end
+        ### Impute
+        @time filenames_out = @sync @showprogress @distributed (append!) for f in filenames
+            filename_imputed = IMPUTE(f, window_size=window_size, model=model, distance=distance)
+            [filename_imputed]
+        end
+        ### Trim-off overhanging windows and merge
+        file_out = open(syncx_imputed, "w")
+        for i in 1:length(filenames_out)
+            if i < length(filenames_out)
+                ### trim trailing window from the first and intervening chunks
+                lines = 0
+                file_in = open(filenames_out[i], "r")
+                while !eof(file_in)
+                    lines += 1
+                    readline(file_in);
+                end
+                close(file_in)
+                max_line = lines - (window_size*7)
+            else
+                ### do not trim the last chunk
+                max_line = Inf
+            end
             file_in = open(filenames_out[i], "r")
-            while !eof(file_in)
-                lines += 1
-                readline(file_in);
+            j = 0
+            while (!eof(file_in)) & (j < max_line)
+                j += 1
+                write(file_out, string(readline(file_in), "\n"))
             end
             close(file_in)
-            max_line = lines - (window_size*7)
-        else
-            ### do not trim the last chunk
-            max_line = Inf
+            ### clean up
+            rm(filenames[i])        ### pileup chunks
+            rm(filenames_out[i])    ### syncx chunks
         end
-        file_in = open(filenames_out[i], "r")
-        j = 0
-        while (!eof(file_in)) & (j < max_line)
-            j += 1
-            write(file_out, string(readline(file_in), "\n"))
-        end
-        close(file_in)
-        ### clean up
-        rm(filenames[i])        ### pileup chunks
-        rm(filenames_out[i])    ### syncx chunks
+        close(file_out)
+    else
+        ### Single-threaded execution
+        @show pwd()
+        @show pileup_with_missing
+        syncx_imputed = IMPUTE(pileup_with_missing, window_size=window_size, model=model, distance=distance)
     end
-    close(file_out)
     ### Closing remark
     println("")
     println("####################################################################")

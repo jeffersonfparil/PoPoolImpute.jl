@@ -221,7 +221,11 @@ function IMPUTE!(window::Window; model::String=["Mean", "OLS", "RR", "LASSO", "G
                 β = try
                     hcat(ones(nf), X_train) \ y_train
                 catch
-                    missing
+                    try
+                        LinearAlgebra.pinv(hcat(ones(nf), X_train)'*hcat(ones(nf), X_train)) * (hcat(ones(nf), X_train)'*y_train)
+                    catch
+                        missing
+                    end
                 end
             elseif (model == "RR") | (model == "LASSO") | (model == "GLMNET")
                 model=="RR" ? alpha=0 : model=="LASSO" ? alpha=1 : alpha=0.5
@@ -455,6 +459,11 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
         m = split(readline(file_with_missing), ',')
         i = split(readline(file_imputed), ',')
         idx = m .== "missing"
+        if sum(idx) == 0
+            println(string("No missing data found in ", syncx_with_missing, "."))
+            println("Exiting")
+            exit()
+        end
         c = parse.(Int, c[idx])
         i = try
                 parse.(Int, i[idx])
