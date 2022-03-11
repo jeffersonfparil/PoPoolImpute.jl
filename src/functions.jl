@@ -453,27 +453,21 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     expected = []
     imputed = []
     pool = []
+    not_imputed_counter = 0
     ### TODO: ADD UNIMPUTED DATAPOINTS COUNTER
     while !eof(file_without_missing)
         c = split(readline(file_without_missing), ',')
         m = split(readline(file_with_missing), ',')
         i = split(readline(file_imputed), ',')
         idx = m .== "missing"
-        if sum(idx) == 0
-            println(string("No missing data found in ", syncx_with_missing, "."))
-            println("Exiting")
-            exit()
-        end
         c = parse.(Int, c[idx])
-        i = try
-                parse.(Int, i[idx])
-            catch
-                missing
-            end
-        if !ismissing(i)
+        i = parse.(Int, i[idx])
+        if (length(c) > 0) & (length(i) > 0)
             append!(expected, c)
             append!(imputed, i)
             append!(pool, p[idx])
+        else
+            not_imputed_counter += 1
         end
     end
     close(file_without_missing)
@@ -500,6 +494,11 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
         @show plot1
         @show plot2
     end
+    if length(imputed) == 0
+        println(string("No missing data found in ", syncx_with_missing, "."))
+        println("Exiting")
+        exit()
+    end
     ### Root mean square error
     if rmse
         RMSE_count = sqrt(sum((expected .- imputed).^2)/length(expected))
@@ -518,7 +517,7 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
         end
         close(file_out)
     end
-    return(expected, imputed, expected_freq, imputed_freq)
+    return(expected, imputed, expected_freq, imputed_freq, not_imputed_counter)
 end
 
 function CLONE(window::Window)::Window

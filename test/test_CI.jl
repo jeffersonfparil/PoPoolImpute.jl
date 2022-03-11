@@ -28,7 +28,7 @@ for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
                                         threads=threads,
                                         lines_per_chunk=45)
 
-    expected, imputed, expected_freq, imputed_freq = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
+    expected, imputed, expected_freq, imputed_freq, not_imputed = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
     rm(syncx_imputed)
 
 end 
