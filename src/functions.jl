@@ -1,7 +1,8 @@
-### FORMATTING CONVENTION
+### Naming convention:
 ### (1) variable names: snake_case
 ### (2) structure names: CamelCase
 ### (3) function names: SCREAMING
+
 module functions
 
 using GLMNet
@@ -453,22 +454,20 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     expected = []
     imputed = []
     pool = []
-    not_imputed_counter = 0
-    ### TODO: ADD UNIMPUTED DATAPOINTS COUNTER
+    missing_counter = 0
     while !eof(file_without_missing)
         c = split(readline(file_without_missing), ',')
         m = split(readline(file_with_missing), ',')
         i = split(readline(file_imputed), ',')
-        idx = m .== "missing"
+        missings = (m .== "missing")
+        unimputed = (i .== "missing")
+        idx = (missings) .& (.!unimputed)
         c = parse.(Int, c[idx])
         i = parse.(Int, i[idx])
-        if (length(c) > 0) & (length(i) > 0)
-            append!(expected, c)
-            append!(imputed, i)
-            append!(pool, p[idx])
-        else
-            not_imputed_counter += 1
-        end
+        append!(expected, c)
+        append!(imputed, i)
+        append!(pool, p[idx])
+        missing_counter += sum(missings)
     end
     close(file_without_missing)
     close(file_with_missing)
@@ -501,10 +500,12 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     end
     ### Root mean square error
     if rmse
-        RMSE_count = sqrt(sum((expected .- imputed).^2)/length(expected))
-        RMSE_freq = sqrt(sum((expected_freq .- imputed_freq).^2)/length(expected_freq))
+        RMSE_count = sqrt(abs(sum((expected .- imputed).^2)/length(expected)))
+        RMSE_freq = sqrt(abs(sum((expected_freq .- imputed_freq).^2)/length(expected_freq)))
+        imputed_frac = length(imputed) / missing_counter
         println(string("RMSE_count = ", round(RMSE_count, digits=4)))
         println(string("RMSE_freq = ", round(RMSE_freq, digits=4)))
+        println(string("Percent imputed = ", round(imputed_frac*100), "%"))
     end
     ### save expected and imputed counts and frequencies
     if save
@@ -517,7 +518,7 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
         end
         close(file_out)
     end
-    return(expected, imputed, expected_freq, imputed_freq, not_imputed_counter)
+    return(expected, imputed, expected_freq, imputed_freq, imputed_frac)
 end
 
 function CLONE(window::Window)::Window
@@ -527,7 +528,6 @@ function CLONE(window::Window)::Window
            copy(window.cou),
            copy(window.imp))
 end
-
 
 ### Main
 function IMPUTE(pileup_with_missing::String; window_size::Int=100, model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true, syncx_imputed::String="")::String
