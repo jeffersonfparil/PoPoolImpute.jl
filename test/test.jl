@@ -54,7 +54,7 @@ function GITHUB_CI_TEST(n=10, s=42, threads=2)
     rm(pileup_without_missing)
 end
 
-function EMPIRICAL_TEST(pileup_without_missing="test.pileup", n=10, s=42, threads=20)
+function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42, threads=20)
     syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
     Random.seed!(s)
     random_seeds = abs.(Random.rand(Int, n))
