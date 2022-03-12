@@ -1,14 +1,15 @@
 using Pkg
 using Random
 using Distributed
-threads = 2 ### github actions virtual machine allocated has only 2 cores
-Distributed.addprocs(threads)
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
 
 # @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
 function GITHUB_CI_TEST(n=10, s=42, threads=2)
+    ### NOTE: github actions virtual machine allocated has only 2 cores
+    Distributed.addprocs(threads)
+
     cd("test/")
     run(`tar -xvf test.pileup.tar.xz`)
     pileup_without_missing = "test.pileup"
@@ -55,6 +56,7 @@ function GITHUB_CI_TEST(n=10, s=42, threads=2)
 end
 
 function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42, threads=20)
+    Distributed.addprocs(threads)
     syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
     Random.seed!(s)
     random_seeds = abs.(Random.rand(Int, n))
