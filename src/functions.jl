@@ -362,6 +362,7 @@ function SIMULATESPARSITY(filename; read_length::Int=100, missing_loci_fraction:
     # missing_loci_fraction = 0.50
     # missing_pools_fraction = 0.25
     ###########################################################
+    println("Simulating missing data.")
     if pileup_simulated_missing==""
         pileup_simulated_missing = string(join(split(filename, '.')[1:(end-1)], '.'), "-SIMULATED_MISSING.pileup")
     end
