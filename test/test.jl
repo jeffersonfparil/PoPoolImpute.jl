@@ -8,12 +8,13 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 
 # @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
-function GITHUB_CI_TEST(n=10)
+function GITHUB_CI_TEST(n=10, s=42, threads=2)
     cd("test/")
     run(`tar -xvf test.pileup.tar.xz`)
     pileup_without_missing = "test.pileup"
+    syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
 
-    Random.seed!(42)
+    Random.seed!(s)
     random_seeds = abs.(Random.rand(Int, n))
     for i in random_seeds
         println("####################################################################")
@@ -23,8 +24,7 @@ function GITHUB_CI_TEST(n=10)
                                                                     read_length=10,
                                                                     missing_loci_fraction=0.50,
                                                                     missing_pools_fraction=0.25)
-        @time syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
-        @time syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
+        syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
 
         for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
             syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
@@ -54,9 +54,10 @@ function GITHUB_CI_TEST(n=10)
     rm(pileup_without_missing)
 end
 
-function EMPIRICAL_TEST(pileup_without_missing="test.pileup")
-    Random.seed!(42)
-    random_seeds = abs.(Random.rand(Int, 10))
+function EMPIRICAL_TEST(pileup_without_missing="test.pileup", n=10, s=42, threads=20)
+    syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
+    Random.seed!(s)
+    random_seeds = abs.(Random.rand(Int, n))
     for i in random_seeds
         println("####################################################################")
         println(i)
@@ -65,20 +66,18 @@ function EMPIRICAL_TEST(pileup_without_missing="test.pileup")
                                                                     read_length=10,
                                                                     missing_loci_fraction=0.50,
                                                                     missing_pools_fraction=0.25)
-        @time syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
-        @time syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
+        syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
 
         for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
             syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
-                                                window_size=20,
+                                                window_size=1_000,
                                                 model=model,
                                                 distance=true,
                                                 threads=threads,
-                                                lines_per_chunk=45)
+                                                lines_per_chunk=10_000)
 
             expected, imputed, expected_freq, imputed_freq, imputed_frac = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
             rm(syncx_imputed)
-
         end 
 
         ### Clean-up
@@ -88,7 +87,6 @@ function EMPIRICAL_TEST(pileup_without_missing="test.pileup")
             rm(f)
         end
     end
-
     println("Concatenate these output files:")
     files = readdir()
     for f in files[match.(Regex("Imputation_cross_validation_output-"), files) .!= nothing]
