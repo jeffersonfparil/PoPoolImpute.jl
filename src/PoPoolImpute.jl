@@ -18,8 +18,8 @@ using ProgressMeter
 3. model [String; default="OLS"]: imputation model to use. Choose from "Mean" (average allele count), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator regression), "GLMNET" (elastic-net regression at α=0.5)
 4. distance [Bool; default=true]: use the first 3 principal components of the pairwise loci distance matrix as an additional covariate
 5. syncx_imputed [String; default=\${pileup_with_missing%.pileup*}-IMPUTED.syncx]: filename of the imputation output file
-6. threads [Int; default=1]
-7. lines_per_chunk::Int=10_000
+6. threads [Int; default=1]: number of computing threads or cores to use
+7. lines_per_chunk [Int; default=10,000]: number of loci per input file of a parallel imputation process
 
 # Output
 syncx_imputed:
@@ -27,8 +27,8 @@ Syncx format (after popoolation2's sync or synchronised pileup file format):
 - Column 1:   chromosome or scaffold name
 - Column 2:   locus position repeated 7 times corresponding to alleles "A", "T", "C", "G", "INS", "DEL", "N", where "INS" is insertion, "DEL" is deletion, and "N" is unclassified
 - Column 3-n: allele counts one column for each pool or population
-# Examples
 
+# Examples
 ```
 # Single-threaded execution
 using PoPoolImpute
@@ -61,7 +61,9 @@ Performs a simple least squares linear regression to predict missing allele coun
     + inverse() is the Moore-Penrose pseudoinverse if the automatic Julia solver fails;
     + ŷₘ is the vector of imputed allele counts of one of the pools with missing data (length: mₘ missing loci × 7 alleles); and
     + Xₘ is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: mₘ non-missing loci × 7 alleles, nₚ pools without missing loci).
-The imputed allele counts are averaged across the windows sliding one locus at a time.
+
+- The imputed allele counts are averaged across the windows sliding one locus at a time.
+
 # Author
 - Jeff Paril (jeffersonparil@gmail.com; https://orcid.org/0000-0002-5693-4123)
 ...

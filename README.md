@@ -6,67 +6,56 @@ Imputation of allele frequency information from pool sequencing genotype data.
 | <a href="https://adaptive-evolution.biosciences.unimelb.edu.au/"><img src="https://adaptive-evolution.biosciences.unimelb.edu.au/Adaptive%20Evolution%20Logo%20mod.png" width="150"></a> | <a href="https://github.com/jeffersonfparil/PoPoolImpute.jl/actions"><img src="https://github.com/jeffersonfparil/PoPoolImpute.jl/actions/workflows/julia.yml/badge.svg"></a> | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
 
 # Usage
-```
-PopPoolImpute.impute(str_filename_input; int_window_size=10, flt_maximum_fraction_of_pools_with_missing=0.5, flt_maximum_fraction_of_loci_with_missing=0.5, str_filename_output="output-imputed.syncx", bool_use_distance_matrix=false, str_model=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], flt_glmnet_alpha=0.5, int_thread_count=2)
-```
+`PopPoolImpute.impute(pileup_with_missing::String; window_size::Int=100, model::String=["Mean", "OLS", "RR", "LASSO", "GLMNET"][2], distance::Bool=true, syncx_imputed::String="", threads::Int=2, lines_per_chunk::Int=10_000)::String`
 
 # Inputs
-1. *str_filename_input* [String]: filename of the genotype data in [pileup format (.pileup)](http://samtools.sourceforge.net/pileup.shtml)
-2. *n_int_window_size* [Integer; default=10]: size of the sliding window across which imputation is performed
-3. *n_flt_maximum_fraction_of_pools_with_missing* [Float; default=0.5]: maximum tolerable fraction of the pools with at least one missing locus
-4. *n_flt_maximum_fraction_of_loci_with_missing* [Float; default=0.5]: maximum tolerable fraction of the loci with missing data
-5. *bool_use_distance_matrix* [Boolean; default=false]: perform ordinary least squares regression with pairwise loci distances covariate
-6. *str_model* [String; default="OLS"]: imputation model to use. Choose from "Mean" (average counts in the non-missing pools), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator), and "GLMNET" (elastic net with additional parameter flt_glmnet_alpha; default=0.5)
-
-7. *n_int_thread_count* [Integer; default=2]: number of computing threads to use
+1. pileup_with_missing \[String\]: filename of input pileup file
+2. window_size \[Int; default=100\]: number of loci per window
+3. model \[String; default="OLS"\]: imputation model to use. Choose from "Mean" (average allele count), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator regression), "GLMNET" (elastic-net regression at α=0.5)
+4. distance \[Bool; default=true\]: use the first 3 principal components of the pairwise loci distance matrix as an additional covariate
+5. syncx_imputed \[String; default=\${pileup_with_missing%.pileup*}-IMPUTED.syncx\]: filename of the imputation output file
+6. threads \[Int; default=1\]: number of computing threads or cores to use
+7. lines_per_chunk \[Int; default=10,000\]: number of loci per input file of a parallel imputation process
 
 # Output
-*str_filename_output* [String; default="output-imputed.syncx"; comma-separated file]
-
-**Syncx format** (after popoolation2's sync or synchronised pileup file format):
-- *Column 1*:   chromosome or scaffold name
-- *Column 2*:   locus position repeated 7 times corresponding to alleles "A", "T", "C", "G", "INS", "DEL", "N", where "INS" is insertion, "DEL" is deletion, and "N" is unclassified
-- *Columns 3 to n*: are the allele counts one column for each pool or population
-
-# Installation
-```
-using Pkg
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-```
+**Syncx** format (after popoolation2's sync or synchronised pileup file format):
+- Column 1:   chromosome or scaffold name
+- Column 2:   locus position repeated 7 times corresponding to alleles "A", "T", "C", "G", "INS", "DEL", "N", where "INS" is insertion, "DEL" is deletion, and "N" is unclassified
+- Column 3-n: allele counts one column for each pool or population
 
 # Examples
+
 ```
 # Single-threaded execution
 using PoPoolImpute
-str_filename_input = "test.pileup"
-PoPoolImpute.impute(str_filename_input)
+PoPoolImpute.impute("test.pileup")
 
 # Multi-threaded execution
 using Distributed
-n_int_thread_count = length(Sys.cpu_info())-1
-Distributed.addprocs(n_int_thread_count)
+int_thread_count = length(Sys.cpu_info())-1
+Distributed.addprocs(int_thread_count)
 @everywhere using PoPoolImpute
-PoPoolImpute.impute(str_filename_input, str_filename_output="multithreaded.syncx", n_int_thread_count=n_int_thread_count)
+PoPoolImpute.impute("test.pileup", window_size=20, threads=2, lines_per_chunk=30)
 ```
+
 # Details
+Performs a simple least squares linear regression to predict missing allele counts per window for each pool with at least one locus with missing data.
+- For each pool with missing data we estimate β̂ as:
+```
+          yₚ = Xₚβ
+        → β̂ = inverse(XₚᵀXₚ) (Xₚᵀyₚ).
+```
 
-Performs simple mean extrapolation and various linear regression algorithms to predict missing allele counts per window:
+- For each pool with missing data we, imputation is achieved by predicting the missing allele counts:
+```
+          ŷₘ = XₘB̂.
+```
+- Where:
+    + yₚ is the vector of allele counts of one of the pools with missing data at the loci without missing data (length: mₚ non-missing loci × 7 alleles);
+    + Xₚ is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: mₚ non-missing loci × 7 alleles, nₚ pools without missing loci);
+    + β̂ is the vector of estimates of the effects of each pool without missing data on the allele counts of one of the pools with missing data (length: nₚ pools without missing loci);
+    + inverse() is the Moore-Penrose pseudoinverse if the automatic Julia solver fails;
+    + ŷₘ is the vector of imputed allele counts of one of the pools with missing data (length: mₘ missing loci × 7 alleles); and
+    + Xₘ is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: mₘ non-missing loci × 7 alleles, nₚ pools without missing loci).
 
-**Xₚₘ = XₚₚB**
-
-**→ B̂ = F(Xₚₚ, Xₚₘ, ...)**.
-
-Imputation is achieved by predicting the missing allele counts:
-
-**X̂ₘₘ = XₘₚB̂**.
-
-Where:
-
-- **Xₚₘ** is the matrix of allele counts of pools with missing data at the loci without missing data (dimensions: **mₚ** non-missing loci × 7 alleles, **nₘ** pools with missing loci);
-- **Xₚₚ** is the matrix of allele counts of pools without missing data at the loci without missing data in the other pools (dimensions: **mₚ** non-missing loci × 7 alleles, **nₚ** pools without missing loci);
-- **B̂** is the matrix of estimates of the effects of each pool without missing data on the allele counts of the pools with missing data (dimensions: **nₚ** pools without missing loci, **nₘ** pools with missing loci);
-- **F()** refers to any of the imputation models implemented, i.e. means of th non-missing pools, ordinary least squares, ridge regression, LASSO, and elastic net regularisation;
-- **X̂ₘₘ** is the matrix of imputed allele counts of pools with missing data (dimensions: **mₘ** missing loci × 7 alleles, **nₘ** pools with missing loci); and
-- **Xₘₚ** is the matrix of allele counts of pools without missing data at the loci with missing data in the other pools (dimensions: **mₘ** non-missing loci × 7 alleles, **nₚ** pools without missing loci).
-
-The imputed allele counts are averaged across the windows sliding one locus at a time.
+- The imputed allele counts are averaged across the windows sliding one locus at a time.
