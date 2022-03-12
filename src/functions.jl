@@ -68,10 +68,10 @@ function PARSE(line::PileupLine, minimum_quality=20)::LocusAlleleCounts
                     if vec_qua_per_pool[k][1] != '*'
                         Int(vec_qua_per_pool[k][1]) - 33
                     else 
-                        q = 0
+                        0
                     end
                 catch
-                    nothing
+                    0
                 end
 
             ### allele states
@@ -370,7 +370,7 @@ function SIMULATESPARSITY(filename; read_length::Int=100, missing_loci_fraction:
     println("Counting pools.")
     file_temp = open(filename, "r")
     i = -1
-    if i <0
+    if i < 0
         i += 1
         line = readline(file_temp)
     end
