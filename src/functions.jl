@@ -324,6 +324,8 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
             i1 = 0
         end
     end
+    close(out1)
+    close(out2)
     close(file)
     ### Remove tailing files with size less than or equal to the window size
     dir = if dirname(filename) == ""
@@ -456,15 +458,17 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     imputed = []
     pool = []
     missing_counter = 0
+    # counter = 0
     while !eof(file_without_missing)
+        # counter += 1; @show counter
         c = split(readline(file_without_missing), ',')
         m = split(readline(file_with_missing), ',')
         i = split(readline(file_imputed), ',')
         missings = (m .== "missing")
         unimputed = (i .== "missing")
         idx = (missings) .& (.!unimputed)
-        c = parse.(Int, c[idx])
-        i = parse.(Int, i[idx])
+        c = parse.(Int, c[idx]); # @show c
+        i = parse.(Int, i[idx]); # @show i
         append!(expected, c)
         append!(imputed, i)
         append!(pool, p[idx])

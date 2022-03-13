@@ -2,10 +2,10 @@ using Pkg
 using Random
 using Distributed 
 Distributed.addprocs(2)
-# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# @everywhere using PoPoolImpute
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+@everywhere using PoPoolImpute
 
-@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
 function GITHUB_CI_TEST(n=10, s=42, threads=2)
     cd("test/")
