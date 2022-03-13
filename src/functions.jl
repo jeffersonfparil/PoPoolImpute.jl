@@ -488,6 +488,9 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
                     expected_freq[idx] = expected[idx]/sum(expected[idx])
                     imputed_freq[idx] = imputed[idx]/sum(imputed[idx])
                 end
+                ### convert undefined quotients (0/0 = NaN) to zero
+                expected_freq[isnan.(expected_freq)] .= 0.0
+                imputed_freq[isnan.(imputed_freq)] .= 0.0
                 ### save imputed locus data
                 file_out = open(csv_out, "a")
                 for y in 1:length(pool)
