@@ -2,12 +2,12 @@ using Pkg
 using Random
 using Distributed 
 Distributed.addprocs(2)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
 
-# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
-function GITHUB_CI_TEST(n=10, s=42)
+function GITHUB_CI_TEST(n=10, s=42, threads=2)
     cd("test/")
     run(`tar -xvf test.pileup.tar.xz`)
     pileup_without_missing = "test.pileup"
@@ -53,7 +53,7 @@ function GITHUB_CI_TEST(n=10, s=42)
     rm(pileup_without_missing)
 end
 
-function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42)
+function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42, threads=20)
     syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
     Random.seed!(s)
     random_seeds = abs.(Random.rand(Int, n))
