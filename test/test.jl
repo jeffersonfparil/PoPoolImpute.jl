@@ -11,9 +11,11 @@ threads = parse(Int, ARGS[5])
 # threads=2
 #
 # time julia test/test.jl test.pileup true 1 123 2
+#
+# cd /data-weedomics-1
 # time \
 # julia PoPoolImpute.jl/test/test.jl \
-#       ctDNA.mpileup-FILTERED_0.0.pileup \
+#       ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup \
 #       false \
 #       10 \
 #       42069 \
@@ -38,10 +40,10 @@ syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missi
 
 Random.seed!(s)
 random_seeds = abs.(Random.rand(Int, n))
-for i in random_seeds
+for i in 1:length(random_seeds)
     println("####################################################################")
-    println(i)
-    Random.seed!(i)
+    println(random_seeds[i])
+    Random.seed!(random_seeds[i])
     pileup_with_missing = PoPoolImpute.functions.SIMULATESPARSITY(pileup_without_missing,
                                                                 read_length=10,
                                                                 missing_loci_fraction=0.50,
@@ -54,7 +56,8 @@ for i in random_seeds
                                             model=model,
                                             distance=true,
                                             threads=threads,
-                                            lines_per_chunk=45)
+                                            lines_per_chunk=45,
+                                            syncx_imputed=string("Imputation_cross_validation_output-", model, "-REP_", i , ".syncx"))
         println("Cross-validating")
         csv_accuracy = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing,
                                                             syncx_with_missing,
