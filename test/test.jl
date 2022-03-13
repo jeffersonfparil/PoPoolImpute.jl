@@ -3,14 +3,18 @@ githubci = parse(Bool, ARGS[2])
 n = parse(Int, ARGS[3])
 s = parse(Int, ARGS[4])
 threads = parse(Int, ARGS[5])
+window_size = parse(Int, ARGS[6])
+lines_per_chunk = parse(Int, ARGS[7])
 ### TEST
 # pileup_without_missing="test.pileup"
 # githubci=true
 # n=10
 # s=42
 # threads=2
+# window_size=20
+# lines_per_chunk=45
 #
-# time julia test/test.jl test.pileup true 1 123 2
+# time julia test/test.jl test.pileup true 1 123 2 20 45
 #
 # cd /data-weedomics-1
 # time \
@@ -19,7 +23,10 @@ threads = parse(Int, ARGS[5])
 #       false \
 #       10 \
 #       42069 \
-#       20
+#       20 \
+#       1000 \
+#       10000
+
 
 using Pkg
 using Random
@@ -52,11 +59,11 @@ for i in 1:length(random_seeds)
 
     for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
         syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
-                                            window_size=20,
+                                            window_size=window_size,
                                             model=model,
                                             distance=true,
                                             threads=threads,
-                                            lines_per_chunk=45,
+                                            lines_per_chunk=lines_per_chunk,
                                             syncx_imputed=string("Imputation_cross_validation_output-", model, "-REP_", i , ".syncx"))
         println("Cross-validating")
         csv_accuracy = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing,
