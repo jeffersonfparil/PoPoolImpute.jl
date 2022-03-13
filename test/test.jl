@@ -33,9 +33,9 @@ using Random
 using UnicodePlots
 using Distributed
 Distributed.addprocs(threads)
-# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-# @everywhere using PoPoolImpute
-@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+@everywhere using PoPoolImpute
+# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
 ### Navigate tp the working directory and refer to the input file's base name instead of its full path
 if dirname(pileup_without_missing) != ""
