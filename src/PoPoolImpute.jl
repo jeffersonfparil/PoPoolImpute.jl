@@ -14,7 +14,7 @@ using ProgressMeter
 
 # Inputs
 1. pileup_with_missing [String]: filename of input pileup file
-2. window_size [Int; default=100]: number of loci per window
+2. window_size [Int; default=100]: number of loci per window which should be around the same size as the sequencing read length (Note: at least 1 pool without any missing data across the window is needed for imputation)
 3. model [String; default="OLS"]: imputation model to use. Choose from "Mean" (average allele count), "OLS" (ordinary least squares), "RR" (ridge regression), "LASSO" (least absolute shrinkage and selection operator regression), "GLMNET" (elastic-net regression at α=0.5)
 4. distance [Bool; default=true]: use the first 3 principal components of the pairwise loci distance matrix as an additional covariate
 5. syncx_imputed [String; default=\${pileup_with_missing%.pileup*}-IMPUTED.syncx]: filename of the imputation output file

@@ -24,7 +24,7 @@ lines_per_chunk = parse(Int, ARGS[7])
 #       10 \
 #       42069 \
 #       20 \
-#       1000 \
+#       100 \
 #       10000
 
 
@@ -55,7 +55,7 @@ for i in 1:length(random_seeds)
     println(random_seeds[i])
     Random.seed!(random_seeds[i])
     pileup_with_missing = PoPoolImpute.functions.SIMULATESPARSITY(pileup_without_missing,
-                                                                read_length=10,
+                                                                read_length=window_size,
                                                                 missing_loci_fraction=0.50,
                                                                 missing_pools_fraction=0.25)
     syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)

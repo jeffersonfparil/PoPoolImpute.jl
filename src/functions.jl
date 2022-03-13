@@ -476,7 +476,7 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
         append!(imputed, i)
         append!(pool, p[idx])
         missing_counter += sum(missings)
-        if length(idx) > 0
+        if sum(idx) > 0
             imputed_counter += sum(missings)
         end
         if length(pool) > 0
