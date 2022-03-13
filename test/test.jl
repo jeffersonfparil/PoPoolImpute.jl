@@ -86,15 +86,11 @@ function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42, threads=20)
 
         ### Clean-up
         rm(pileup_with_missing)
-        files = readdir()
-        for f in files[match.(Regex("syncx"), files) .!= nothing]
-            rm(f)
-        end
     end
     println("Concatenate these output files:")
     files = readdir()
-    for f in files[match.(Regex("Imputation_cross_validation_output-"), files) .!= nothing]
-        println(f)
+    for f in files[match.(Regex("syncx"), files) .!= nothing]
+        rm(f)
     end
 end
 
