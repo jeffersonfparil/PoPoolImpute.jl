@@ -16,10 +16,10 @@ lines_per_chunk = parse(Int, ARGS[7])
 #
 # time julia test/test.jl test.pileup true 1 123 2 20 45
 #
-# cd /data-weedomics-1
+# DIR=/data-weedomics-1
 # time \
-# julia PoPoolImpute.jl/test/test.jl \
-#       ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup \
+# julia ${DIR}/PoPoolImpute.jl/test/test.jl \
+#       ${DIR}/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup \
 #       false \
 #       10 \
 #       42069 \
@@ -41,6 +41,8 @@ Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 if githubci
     cd("test/")
     run(`tar -xvf test.pileup.tar.xz`)
+else
+    cd(dirname(pileup_without_missing))
 end
 
 syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
