@@ -441,7 +441,7 @@ function SIMULATESPARSITY(filename; read_length::Int=100, missing_loci_fraction:
     end
 end
 
-function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed; plot=false, rmse=false, save=false, csv_out="")
+function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed; csv_out="")
     # syncx_without_missing = "test.syncx"
     # syncx_with_missing = "test-SIMULATED_MISSING.syncx"
     # syncx_imputed = "test-IMPUTED.syncx"
@@ -450,6 +450,10 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     file = open(syncx_without_missing, "r")
     p = collect(1:length(split(readline(file), ',')))
     close(file)
+    ### output file
+    if csv_out == ""
+        csv_out = string("Imputation_cross_validation_output-", time(), ".csv")
+    end
     ### extract expected and imputed allele counts
     file_without_missing = open(syncx_without_missing, "r")
     file_with_missing    = open(syncx_with_missing, "r")
@@ -458,72 +462,54 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     imputed = []
     pool = []
     missing_counter = 0
-    # counter = 0
+    imputed_counter = 0
     while !eof(file_without_missing)
-        # counter += 1; @show counter
         c = split(readline(file_without_missing), ',')
         m = split(readline(file_with_missing), ',')
         i = split(readline(file_imputed), ',')
         missings = (m .== "missing")
         unimputed = (i .== "missing")
         idx = (missings) .& (.!unimputed)
-        c = parse.(Int, c[idx]); # @show c
-        i = parse.(Int, i[idx]); # @show i
+        c = parse.(Int, c[idx])
+        i = parse.(Int, i[idx])
         append!(expected, c)
         append!(imputed, i)
         append!(pool, p[idx])
         missing_counter += sum(missings)
+        if length(idx) > 0
+            imputed_counter += sum(missings)
+        end
+        if length(pool) > 0
+            if sum(unique(pool)[1] .== pool)/7 == 1.0
+                expected_freq = zeros(length(pool))
+                imputed_freq = zeros(length(pool))
+                for x in pool
+                    idx = pool .== x
+                    expected_freq[idx] = expected[idx]/sum(expected[idx])
+                    imputed_freq[idx] = imputed[idx]/sum(imputed[idx])
+                end
+                ### save imputed locus data
+                file_out = open(csv_out, "a")
+                for y in 1:length(pool)
+                    write(file_out, string(join([expected[y], imputed[y], expected_freq[y], imputed_freq[y]], ','), "\n"))
+                end
+                close(file_out)
+                ### reset
+                expected = []
+                imputed = []
+                pool = []
+            end
+        end
     end
     close(file_without_missing)
     close(file_with_missing)
     close(file_imputed)
-    ### calculate allele frequencies
-    expected_freq = []
-    imputed_freq = []
-    for i in pool
-        idx = pool .== i
-        X = reshape(expected[idx], (7, Int(sum(idx)/7)))
-        append!(expected_freq, reshape(X ./ sum(X, dims=1), (length(X), )))
-        X = reshape(imputed[idx], (7, Int(sum(idx)/7)))
-        append!(imputed_freq, reshape(X ./ sum(X, dims=1), (length(X), )))
-    end
-    ### plot
-    if plot
-        plot1 = UnicodePlots.scatterplot(Int.(expected), Int.(imputed),
-                                         title="Counts",
-                                         grid=true, color=:white, canvas=BlockCanvas)
-        plot2 = UnicodePlots.scatterplot(Float64.(expected_freq), Float64.(imputed_freq),
-                                         title="Frequencies",
-                                         grid=true, color=:white, canvas=BlockCanvas)
-        @show plot1
-        @show plot2
-    end
-    if length(imputed) == 0
-        println(string("No missing data found in ", syncx_with_missing, "."))
-        println("Exiting")
-        exit()
-    end
-    ### Root mean square error
-    if rmse
-        RMSE_count = sqrt(abs(sum((expected .- imputed).^2)/length(expected)))
-        RMSE_freq = sqrt(abs(sum((expected_freq .- imputed_freq).^2)/length(expected_freq)))
-        imputed_frac = length(imputed) / missing_counter
-        println(string("RMSE_count = ", round(RMSE_count, digits=4)))
-        println(string("RMSE_freq = ", round(RMSE_freq, digits=4)))
-        println(string("Percent imputed = ", round(imputed_frac*100), "%"))
-    end
-    ### save expected and imputed counts and frequencies
-    if save
-        if csv_out == ""
-            csv_out = string("Imputation_cross_validation_output-", time(), ".csv")
-        end
-        file_out = open(csv_out, "w")
-        for i in 1:length(expected)
-            write(file_out, string(join([expected[i], imputed[i], expected_freq[i], imputed_freq[i]], ','), "\n"))
-        end
-        close(file_out)
-    end
-    return(expected, imputed, expected_freq, imputed_freq, imputed_frac)
+    ### write out proportion of imputed missing data at the last line of the output file
+    file_out = open(csv_out, "a")
+    write(file_out, string(join([imputed_counter/missing_counter, "", "", ""], ','), "\n"))
+    close(file_out)
+    ### output
+    return(csv_out)
 end
 
 function CLONE(window::Window)::Window

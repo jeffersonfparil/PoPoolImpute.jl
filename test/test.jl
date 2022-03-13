@@ -1,7 +1,8 @@
 using Pkg
 using Random
-using Distributed 
-Distributed.addprocs(2)
+using Distributed
+threads = 2
+Distributed.addprocs(threads)
 Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
 @everywhere using PoPoolImpute
 
@@ -33,7 +34,9 @@ function GITHUB_CI_TEST(n=10, s=42, threads=2)
                                                 threads=threads,
                                                 lines_per_chunk=45)
 
-            expected, imputed, expected_freq, imputed_freq, imputed_frac = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
+            PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing,
+                                                 syncx_with_missing,
+                                                 syncx_imputed)
             rm(syncx_imputed)
 
         end 
@@ -75,7 +78,9 @@ function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42, threads=20)
                                                 threads=threads,
                                                 lines_per_chunk=10_000)
 
-            expected, imputed, expected_freq, imputed_freq, imputed_frac = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed, plot=true, rmse=true, save=true)
+            PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing, 
+                                                 syncx_with_missing,
+                                                 syncx_imputed)
             rm(syncx_imputed)
         end 
 
@@ -92,3 +97,6 @@ function EMPIRICAL_TEST(pileup_without_missing, n=10, s=42, threads=20)
         println(f)
     end
 end
+
+# GITHUB_CI_TEST(1, 42, 2)
+# EMPIRICAL_TEST("ctDNA.mpileup-FILTERED_0.0.pileup", 10, 42, 20)
