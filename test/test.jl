@@ -14,7 +14,7 @@ lines_per_chunk = parse(Int, ARGS[7])
 # window_size=20
 # lines_per_chunk=45
 #
-# time julia test/test.jl test.pileup true 1 123 2 20 45
+# time julia test/test.jl test/test.pileup true 1 123 2 20 45
 #
 # DIR=/data-weedomics-1
 # time \
@@ -33,16 +33,17 @@ using Random
 using UnicodePlots
 using Distributed
 Distributed.addprocs(threads)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
+@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
-# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
-
-if githubci
-    cd("test/")
-    run(`tar -xvf test.pileup.tar.xz`)
-else
+### Navigate tp the working directory and refer to the input file's base name instead of its full path
+if dirname(pileup_without_missing) != ""
     cd(dirname(pileup_without_missing))
+    pileup_without_missing = basename(pileup_without_missing)
+end
+if githubci
+    run(`tar -xvf test.pileup.tar.xz`)
 end
 
 syncx_without_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_without_missing)
@@ -65,12 +66,12 @@ for i in 1:length(random_seeds)
                                             model=model,
                                             distance=true,
                                             threads=threads,
-                                            lines_per_chunk=lines_per_chunk,
-                                            syncx_imputed=string("Imputation_cross_validation_output-", model, "-REP_", i , ".syncx"))
+                                            lines_per_chunk=lines_per_chunk)
         println("Cross-validating")
         csv_accuracy = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing,
                                                             syncx_with_missing,
-                                                            syncx_imputed)
+                                                            syncx_imputed, 
+                                                            csv_out=string("Imputation_cross_validation_output-", model, "-REP_", i , ".csv"))
         ### plot
         file = open(csv_accuracy)
         expected = []
