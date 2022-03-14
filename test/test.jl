@@ -19,13 +19,13 @@ lines_per_chunk = parse(Int, ARGS[7])
 # DIR=/data-weedomics-1
 # time \
 # julia ${DIR}/PoPoolImpute.jl/test/test.jl \
-#       ${DIR}/ctDNA/ctDNA.mpileup-FILTERED_0.0.pileup \
+#       ${DIR}/Drosophila/Drosophila-FILTERED_0.0.pileup \
 #       false \
 #       10 \
 #       42069 \
 #       20 \
 #       100 \
-#       10000
+#       500
 
 
 using Pkg
@@ -64,7 +64,7 @@ for i in 1:length(random_seeds)
         syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
                                             window_size=window_size,
                                             model=model,
-                                            distance=true,
+                                            distance=false,
                                             threads=threads,
                                             lines_per_chunk=lines_per_chunk)
         println("Cross-validating")
