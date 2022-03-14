@@ -19,23 +19,32 @@ lines_per_chunk = parse(Int, ARGS[7])
 # DIR=/data-weedomics-1
 # time \
 # julia ${DIR}/PoPoolImpute.jl/test/test.jl \
-#       ${DIR}/Drosophila/Drosophila-FILTERED_0.0.pileup \
+#       ${DIR}/ctDNA/ctDNA-FILTERED_0.0.pileup \
 #       false \
 #       10 \
 #       42069 \
 #       20 \
 #       100 \
 #       500
-
+#
+# pileup_without_missing="/home/jeffersonfparil/Downloads/data/PoPoolImpute/Drosophila-FILTERED_0.0.pileup"
+# githubci=false
+# n=1
+# s=42
+# threads=2
+# window_size=100
+# lines_per_chunk=1000
+# i = 1
+# model = "RR"
 
 using Pkg
 using Random
 using UnicodePlots
 using Distributed
 Distributed.addprocs(threads)
-Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
-@everywhere using PoPoolImpute
-# @everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
+# Pkg.add(url="https://github.com/jeffersonfparil/PoPoolImpute.jl.git")
+# @everywhere using PoPoolImpute
+@everywhere include("/home/jeffersonfparil/Documents/PoPoolImpute.jl/src/PoPoolImpute.jl")
 
 ### Navigate tp the working directory and refer to the input file's base name instead of its full path
 if dirname(pileup_without_missing) != ""

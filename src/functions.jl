@@ -248,11 +248,11 @@ function IMPUTE!(window::Window; model::String=["Mean", "OLS", "RR", "LASSO", "G
                 y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
                 # y_imputed .-= minimum(y_imputed)
 
+                window.imp[idx_loci, j] .+= 1
                 y_imputed_mean = append!([], ((window.cou[idx_loci, j] .* window.imp[idx_loci, j]) .+ y_imputed) ./ (window.imp[idx_loci, j] .+ 1))
                 y_imputed_mean[ismissing.(y_imputed_mean)] = y_imputed
 
                 window.cou[idx_loci, j] = Int.(round.(y_imputed_mean))
-                window.imp[idx_loci, j] .+= 1
             end
         end
     else
@@ -283,6 +283,17 @@ function PILEUP2SYNCX(filename::String)::String
 end
 
 function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector{String}
+    ### count the number of lines
+    n = 0
+    file = open(filename, "r")
+    while !eof(file)
+        _ = readline(file)
+        n+=1
+    end
+    close(file)
+    ### To add or not to add leading zeros for ease of chunk sorting
+    leading_zeros = length(digits(Int(ceil(n / lines_per_chunk)))) - 1
+
     file = open(filename, "r")
     c1 = 0; c2 = 0
     i1 = 0; i2 = (lines_per_chunk+window_size+1)
@@ -292,11 +303,13 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
         ### initialise chunk file
         if i1 == 0
             c1 = c2 + 1
-            global out1 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", c1, ".pileup"), "w")
+            chunk_number = string(repeat("0", leading_zeros-Int(leading_zeros*floor(log(10, c1)))), c1)
+            global out1 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", chunk_number, ".pileup"), "w")
         end
         if i2 == 0
             c2 = c1 + 1
-            global out2 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", c2, ".pileup"), "w")
+            chunk_number = string(repeat("0", leading_zeros-Int(leading_zeros*floor(log(10, c2)))), c2)
+            global out2 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", chunk_number, ".pileup"), "w")
         end
         ### write into chunk file
         if i1 < (lines_per_chunk+window_size)

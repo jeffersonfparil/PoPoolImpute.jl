@@ -110,6 +110,8 @@ function impute(pileup_with_missing::String; window_size::Int=100, model::String
             filename_imputed = IMPUTE(f, window_size=window_size, model=model, distance=distance)
             [filename_imputed]
         end
+        ### Sort the chunks so we maintain the one-to-one correspondence between input and output loci arrangement
+        sort!(filenames_out)
         ### Trim-off overhanging windows and merge
         file_out = open(syncx_imputed, "w")
         for i in 1:length(filenames_out)
