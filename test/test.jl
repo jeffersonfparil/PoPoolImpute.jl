@@ -25,7 +25,7 @@ lines_per_chunk = parse(Int, ARGS[7])
 #       42069 \
 #       20 \
 #       100 \
-#       500
+#       1000
 #
 # pileup_without_missing="/home/jeffersonfparil/Downloads/data/PoPoolImpute/Drosophila-FILTERED_0.0.pileup"
 # githubci=false

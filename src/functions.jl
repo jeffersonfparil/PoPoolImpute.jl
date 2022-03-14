@@ -303,12 +303,12 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
         ### initialise chunk file
         if i1 == 0
             c1 = c2 + 1
-            chunk_number = string(repeat("0", leading_zeros-Int(leading_zeros*floor(log(10, c1)))), c1)
+            chunk_number = string(repeat("0", leading_zeros-Int(floor(log(10, c1)))), c1)
             global out1 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", chunk_number, ".pileup"), "w")
         end
         if i2 == 0
             c2 = c1 + 1
-            chunk_number = string(repeat("0", leading_zeros-Int(leading_zeros*floor(log(10, c2)))), c2)
+            chunk_number = string(repeat("0", leading_zeros-Int(floor(log(10, c2)))), c2)
             global out2 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", chunk_number, ".pileup"), "w")
         end
         ### write into chunk file
