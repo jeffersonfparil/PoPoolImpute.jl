@@ -19,7 +19,7 @@ lines_per_chunk = parse(Int, ARGS[7])
 # DIR=/data-weedomics-1
 # time \
 # julia ${DIR}/PoPoolImpute.jl/test/test.jl \
-#       ${DIR}/ctDNA/ctDNA-FILTERED_0.0.pileup \
+#       ${DIR}/Human/Human-FILTERED_0.0.pileup \
 #       false \
 #       10 \
 #       42069 \
@@ -68,52 +68,53 @@ for i in 1:length(random_seeds)
                                                                 missing_loci_fraction=0.50,
                                                                 missing_pools_fraction=0.25)
     syncx_with_missing = PoPoolImpute.functions.PILEUP2SYNCX(pileup_with_missing)
-
-    for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
-        syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
-                                            window_size=window_size,
-                                            model=model,
-                                            distance=false,
-                                            threads=threads,
-                                            lines_per_chunk=lines_per_chunk)
-        println("Cross-validating")
-        csv_accuracy = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing,
-                                                            syncx_with_missing,
-                                                            syncx_imputed, 
-                                                            csv_out=string("Imputation_cross_validation_output-", model, "-REP_", i , ".csv"))
-        ### plot
-        file = open(csv_accuracy)
-        expected = []
-        imputed = []
-        expected_freq = []
-        imputed_freq = []
-        fraction_of_missing_imputed = 0
-        while !eof(file)
-            line = split(readline(file), ',')
-            if line[2] != "" 
-                push!(expected, parse(Float64, line[1]))
-                push!(imputed, parse(Float64, line[2]))
-                push!(expected_freq, parse(Float64, line[3]))
-                push!(imputed_freq, parse(Float64, line[4]))
-            else
-                fraction_of_missing_imputed = parse(Float64, line[1])
+    for distance in [false, true]
+        for model in ["Mean", "OLS", "RR", "LASSO", "GLMNET"]
+            syncx_imputed = PoPoolImpute.impute(pileup_with_missing,
+                                                window_size=window_size,
+                                                model=model,
+                                                distance=distance,
+                                                threads=threads,
+                                                lines_per_chunk=lines_per_chunk)
+            println("Cross-validating")
+            csv_accuracy = PoPoolImpute.functions.CROSSVALIDATE(syncx_without_missing,
+                                                                syncx_with_missing,
+                                                                syncx_imputed, 
+                                                                csv_out=string("Imputation_cross_validation_output-", model, "-distPC_", distance, "-REP_", i , ".csv"))
+            ### plot
+            file = open(csv_accuracy)
+            expected = []
+            imputed = []
+            expected_freq = []
+            imputed_freq = []
+            fraction_of_missing_imputed = 0
+            while !eof(file)
+                line = split(readline(file), ',')
+                if line[2] != "" 
+                    push!(expected, parse(Float64, line[1]))
+                    push!(imputed, parse(Float64, line[2]))
+                    push!(expected_freq, parse(Float64, line[3]))
+                    push!(imputed_freq, parse(Float64, line[4]))
+                else
+                    fraction_of_missing_imputed = parse(Float64, line[1])
+                end
             end
-        end
-        close(file)
-        plot1 = UnicodePlots.scatterplot(Int.(expected), Int.(imputed),
-                                            title="Counts",
-                                            grid=true, color=:white, canvas=BlockCanvas)
-        plot2 = UnicodePlots.scatterplot(Float64.(expected_freq), Float64.(imputed_freq),
-                                            title="Frequencies",
-                                            grid=true, color=:white, canvas=BlockCanvas)
-        @show plot1
-        @show plot2
-        @show RMSE_count = sqrt(sum((expected .- imputed).^2)/length(expected))
-        @show RMSE_freqs = sqrt(sum((expected_freq .- imputed_freq).^2)/length(expected_freq))
-        @show fraction_of_missing_imputed
-        ### Clean-up
-        rm(syncx_imputed)
-    end 
+            close(file)
+            plot1 = UnicodePlots.scatterplot(Int.(expected), Int.(imputed),
+                                                title="Counts",
+                                                grid=true, color=:white, canvas=BlockCanvas)
+            plot2 = UnicodePlots.scatterplot(Float64.(expected_freq), Float64.(imputed_freq),
+                                                title="Frequencies",
+                                                grid=true, color=:white, canvas=BlockCanvas)
+            @show plot1
+            @show plot2
+            @show RMSE_count = sqrt(sum((expected .- imputed).^2)/length(expected))
+            @show RMSE_freqs = sqrt(sum((expected_freq .- imputed_freq).^2)/length(expected_freq))
+            @show fraction_of_missing_imputed
+            ### Clean-up
+            rm(syncx_imputed)
+        end ### models
+    end ### distance PC
     ### Clean-up
     rm(pileup_with_missing)
     rm(syncx_with_missing)
