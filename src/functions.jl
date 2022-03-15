@@ -245,8 +245,8 @@ function IMPUTE!(window::Window; model::String=["Mean", "OLS", "RR", "LASSO", "G
             if !ismissing(β)
                 X_valid = X[idx_loci, :]
                 y_imputed = Int.(round.(hcat(ones(sum(idx_loci)), X_valid) * β))
-                # y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
-                y_imputed .-= minimum(y_imputed)
+                y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
+                # y_imputed .-= minimum(y_imputed)
 
                 window.imp[idx_loci, j] .+= 1
                 y_imputed_mean = append!([], ((window.cou[idx_loci, j] .* window.imp[idx_loci, j]) .+ y_imputed) ./ (window.imp[idx_loci, j] .+ 1))
