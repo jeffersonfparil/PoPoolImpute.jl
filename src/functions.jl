@@ -358,9 +358,10 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
     ls = ls[match.(Regex(join(split(basename(filename), ".")[1:(end-1)], ".")), ls) .!= nothing]
     ls = ls[match.(Regex("CHUNK"), ls) .!= nothing]
     ls = ls[match.(Regex("pileup"), ls) .!= nothing]
+    ls = string.(dirname(filename), "/", ls) ### It is important to have the full path of the chunks since @distributed tasks reverts the working directory to default, i.e. the location where julia was called
     for f in ls
         i = 0
-        file = open(string(dir, "/", f), "r")
+        file = open(f, "r")
         while !eof(file)
             _ = readline(file)
             i += 1
@@ -371,8 +372,6 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
             ls = ls[ls .!= f]
         end
     end
-    ### It is important to have the full path of the chunks since @distributed tasks reverts the working directory to default, i.e. the location where julia was called
-    ls = string.(dirname(filename), "/", ls)
     return(ls)
 end
 
