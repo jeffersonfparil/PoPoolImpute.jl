@@ -92,10 +92,10 @@ function impute(pileup_with_missing::String; window_size::Int=100, model::String
         syncx_imputed = string(join(split(pileup_with_missing, '.')[1:(end-1)], '.'), "-IMPUTED.syncx")
     end
     ### Define the full path to the input and output files since calling functions within @distributed loop will revert back to the root directory from where julia was executed from
-    if dirname(pileup_with_missing) != pwd()
+    if dirname(pileup_with_missing) == ""
         pileup_with_missing = string(pwd(), "/", pileup_with_missing)
     end
-    if dirname(syncx_imputed) != pwd()
+    if dirname(syncx_imputed) == ""
         syncx_imputed = string(pwd(), "/", syncx_imputed)
     end
     if threads > 1
