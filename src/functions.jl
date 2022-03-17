@@ -318,7 +318,11 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
         end
         if i2 < (lines_per_chunk+window_size)
             i2 += 1
-            write(out2, line)
+            try
+                write(out2, line)
+            catch
+                nothing ### if we don't have enough lines to generate a second chunk
+            end
         end
         ### close chunk file
         if i1 == (lines_per_chunk+window_size)
@@ -327,7 +331,11 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
         end
         if i2 == (lines_per_chunk+window_size)
             i2 += 1
-            close(out2)
+            try
+                close(out2)
+            catch
+                nothing ### if we don't have enough lines to generate a second chunk
+            end
         end
         ### reset chunk size
         if i1 == lines_per_chunk

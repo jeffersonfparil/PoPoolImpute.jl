@@ -17,15 +17,26 @@ lines_per_chunk = parse(Int, ARGS[7])
 # time julia test/test.jl test/test.pileup true 1 123 2 20 45
 #
 # DIR=/data-weedomics-1
+# reps=10
+# seed=42069
+# threads=30
+# window_size=100
+# chunk_size=1000
 # time \
-# julia ${DIR}/PoPoolImpute.jl/test/test.jl \
-#       ${DIR}/Human/Human-FILTERED_0.0.pileup \
-#       false \
-#       10 \
-#       42069 \
-#       20 \
-#       100 \
-#       1000
+# for s in ctDNA Drosophila Human
+# do
+#     for distance in false true
+#     do
+#         julia ${DIR}/PoPoolImpute.jl/test/test.jl \
+#             ${DIR}/${s}/${s}-FILTERED_0.0.pileup \
+#             ${distance} \
+#             ${reps} \
+#             ${seed} \
+#             ${threads} \
+#             ${window_size} \
+#             ${chunk_size}
+#     done
+# done
 #
 # pileup_without_missing="/home/jeffersonfparil/Downloads/data/PoPoolImpute/Drosophila-FILTERED_0.0.pileup"
 # githubci=false
