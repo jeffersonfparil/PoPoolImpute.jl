@@ -350,17 +350,17 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
     close(file)
     ### Remove tailing files with size less than or equal to the window size
     dir = if dirname(filename) == ""
-            "."
-        else 
-            dirname(filename)
-        end
+        pwd()
+    else 
+        dirname(filename)
+    end
     ls = readdir(dir)
     ls = ls[match.(Regex(join(split(basename(filename), ".")[1:(end-1)], ".")), ls) .!= nothing]
     ls = ls[match.(Regex("CHUNK"), ls) .!= nothing]
     ls = ls[match.(Regex("pileup"), ls) .!= nothing]
     for f in ls
         i = 0
-        file = open(f, "r")
+        file = open(string(dir, "/", f), "r")
         while !eof(file)
             _ = readline(file)
             i += 1
