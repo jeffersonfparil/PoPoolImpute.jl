@@ -39,4 +39,4 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get install -y tar; julia -e 'import Pkg; Pkg.add("LinearAlgebra"); Pkg.add("UnicodePlots"); Pkg.add("Distributed"); Pkg.add("ProgressMeter")'
       - name: Tests
-        run: julia test/test.jl test/test.pileup true 1 123 2 20 45
+        run: julia test/test.jl test/test.pileup true 1 123 2 20 45 false

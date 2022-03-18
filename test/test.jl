@@ -1,3 +1,8 @@
+println("#######################################################")
+println("Cross-validation of PoPoolImpute.jl imputation accuracy")
+println("#######################################################")
+
+### Arguments
 pileup_without_missing = ARGS[1]
 githubci = parse(Bool, ARGS[2])
 n = parse(Int, ARGS[3])
@@ -5,7 +10,9 @@ s = parse(Int, ARGS[4])
 threads = parse(Int, ARGS[5])
 window_size = parse(Int, ARGS[6])
 lines_per_chunk = parse(Int, ARGS[7])
-### TEST
+distance = parse(Bool, ARGS[8])
+
+### Tests
 # pileup_without_missing="test.pileup"
 # githubci=true
 # n=10
@@ -29,15 +36,17 @@ lines_per_chunk = parse(Int, ARGS[7])
 #     do
 #         julia ${DIR}/PoPoolImpute.jl/test/test.jl \
 #             ${DIR}/${s}/${s}-FILTERED_0.0.pileup \
-#             ${distance} \
+#             false \
 #             ${reps} \
 #             ${seed} \
 #             ${threads} \
 #             ${window_size} \
-#             ${chunk_size}
+#             ${chunk_size} \
+#             ${distance}
 #     done
 # done
 
+### Load libraries
 using Pkg
 using Random
 using UnicodePlots
