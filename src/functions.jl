@@ -245,13 +245,12 @@ function IMPUTE!(window::Window; model::String=["Mean", "OLS", "RR", "LASSO", "G
             if !ismissing(β)
                 X_valid = X[idx_loci, :]
                 y_imputed = Int.(round.(hcat(ones(sum(idx_loci)), X_valid) * β))
-                y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero
+                y_imputed[y_imputed .< 0] .= 0 ### collapse negative counts to zero (negative imputations are only a problem on OLS)
                 # y_imputed .-= minimum(y_imputed)
-
+                ### use the average imputed value
                 window.imp[idx_loci, j] .+= 1
                 y_imputed_mean = append!([], ((window.cou[idx_loci, j] .* window.imp[idx_loci, j]) .+ y_imputed) ./ (window.imp[idx_loci, j] .+ 1))
                 y_imputed_mean[ismissing.(y_imputed_mean)] = y_imputed
-
                 window.cou[idx_loci, j] = Int.(round.(y_imputed_mean))
             end
         end
@@ -264,10 +263,14 @@ end
 
 ### I/O
 function SAVE(window::Window, filename::String)
-    OUT = hcat(repeat(window.chr, inner=7),
-               repeat(window.pos, inner=7),
-               window.cou)
-    out = join([join(x,',') for x in eachrow(OUT)], '\n')
+    OUT = hcat(window.chr, window.pos)
+    n, m = size(window.cou)
+    for i in 1:m
+        # i = 1
+        counts = reshape(window.cou[:,i], (7, Int(n/7)))
+        OUT = hcat(OUT, [join(x,':') for x in eachcol(counts)])
+    end
+    out = join([join(x,'\t') for x in eachrow(OUT)], '\n')
     file = open(filename, "a")
     write(file, string(out, '\n'))
     close(file)
@@ -383,6 +386,7 @@ function SIMULATESPARSITY(filename; read_length::Int=100, missing_loci_fraction:
     # read_length = 150
     # missing_loci_fraction = 0.50
     # missing_pools_fraction = 0.25
+    # pileup_simulated_missing = ""
     ###########################################################
     println("Simulating missing data.")
     if pileup_simulated_missing==""
@@ -464,11 +468,11 @@ end
 function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed; csv_out="")
     # syncx_without_missing = "test.syncx"
     # syncx_with_missing = "test-SIMULATED_MISSING.syncx"
-    # syncx_imputed = "test-IMPUTED.syncx"
+    # syncx_imputed = "test-SIMULATED_MISSING-IMPUTED.syncx"
+    # csv_out=""
     ### NOTE: we should have the same exact locus corresponding per row across these three files
-    ### Pools (list of pool indices including the first 2 columns: chr and pos but we need not worry since these won't ever be missing)
     file = open(syncx_without_missing, "r")
-    p = collect(1:length(split(readline(file), ',')))
+    p = collect(1:length(split(replace(readline(file), '\t'=>':'), ':'))) ### Number of columns delimited by tabs per pool and chromosome coordinate and delimited by colon between alleles
     close(file)
     ### output file
     if csv_out == ""
@@ -478,50 +482,41 @@ function CROSSVALIDATE(syncx_without_missing, syncx_with_missing, syncx_imputed;
     file_without_missing = open(syncx_without_missing, "r")
     file_with_missing    = open(syncx_with_missing, "r")
     file_imputed         = open(syncx_imputed, "r")
-    expected = []
-    imputed = []
-    pool = []
     missing_counter = 0
     imputed_counter = 0
     while !eof(file_without_missing)
-        c = split(readline(file_without_missing), ',')
-        m = split(readline(file_with_missing), ',')
-        i = split(readline(file_imputed), ',')
+        c = split(replace(readline(file_without_missing), '\t'=>':'), ':')
+        m = split(replace(readline(file_with_missing), '\t'=>':'), ':')
+        i = split(replace(readline(file_imputed), '\t'=>':'), ':')
+
+        if ((c[1] == m[1] == i[1]) & (c[2] == m[2] == i[2])) == false
+            println("Error!")
+            println(string(syncx_without_missing, ", ", syncx_with_missing, ", and ", syncx_imputed, " are sorted differently!"))
+            println("Please sort the loci in the same order. Exiting now.")
+            exit()
+        end
         missings = (m .== "missing")
         unimputed = (i .== "missing")
         idx = (missings) .& (.!unimputed)
-        c = parse.(Int, c[idx])
-        i = parse.(Int, i[idx])
-        append!(expected, c)
-        append!(imputed, i)
-        append!(pool, p[idx])
         missing_counter += sum(missings)
         if sum(idx) > 0
             imputed_counter += sum(missings)
-        end
-        if length(pool) > 0
-            if sum(unique(pool)[1] .== pool)/7 == 1.0
-                expected_freq = zeros(length(pool))
-                imputed_freq = zeros(length(pool))
-                for x in pool
-                    idx = pool .== x
-                    expected_freq[idx] = expected[idx]/sum(expected[idx])
-                    imputed_freq[idx] = imputed[idx]/sum(imputed[idx])
-                end
-                ### convert undefined quotients (0/0 = NaN) to zero
-                expected_freq[isnan.(expected_freq)] .= 0.0
-                imputed_freq[isnan.(imputed_freq)] .= 0.0
-                ### save imputed locus data
-                file_out = open(csv_out, "a")
-                for y in 1:length(pool)
-                    write(file_out, string(join([expected[y], imputed[y], expected_freq[y], imputed_freq[y]], ','), "\n"))
-                end
-                close(file_out)
-                ### reset
-                expected = []
-                imputed = []
-                pool = []
-            end
+            ### extract allele counts
+            expected = parse.(Int, c[idx])
+            imputed = parse.(Int, i[idx])
+            ### calculate allele frequencies
+            n = length(expected)
+            _expected = Int.(reshape(expected, (7, Int(n/7))))
+            _imputed = Int.(reshape(imputed, (7, Int(n/7))))
+            expected_freq = vec(_expected ./ sum(_expected, dims=1))
+            imputed_freq = vec(_imputed ./ sum(_imputed, dims=1))
+            ### convert undefined quotients (0/0 = NaN) to zero
+            expected_freq[isnan.(expected_freq)] .= 0.0
+            imputed_freq[isnan.(imputed_freq)] .= 0.0
+            ### save imputed locus data
+            file_out = open(csv_out, "a")
+            write(file_out, string(join([join(x, ',') for x in eachrow(hcat(expected, imputed, expected_freq, imputed_freq))], '\n'),'\n') )
+            close(file_out)
         end
     end
     close(file_without_missing)

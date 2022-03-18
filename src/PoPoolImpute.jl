@@ -43,14 +43,15 @@ PoPoolImpute.impute("test.pileup", window_size=20, threads=2, lines_per_chunk=30
 ```
 
 # Details
-Performs a simple least squares linear regression to predict missing allele counts per window for each pool with at least one locus with missing data.
+Performs simple linear regression to predict missing allele counts per window for each pool with at least one locus with missing data. This imputation method requires at least one pool without missing data across the window. It follows that to maximise the number of loci we can impute, we need to impose a maximum window size equal to the length of the sequencing read used to generate the data, e.g. 100 bp to 150 bp for Illumina reads.
+
 - For each pool with missing data we estimate β̂ as:
 ```
           yₚ = Xₚβ
         → β̂ = inverse(XₚᵀXₚ) (Xₚᵀyₚ).
 ```
 
-- For each pool with missing data we, imputation is achieved by predicting the missing allele counts:
+- For each pool with missing data, imputation is achieved by predicting the missing allele counts:
 ```
           ŷₘ = XₘB̂.
 ```
@@ -124,7 +125,7 @@ function impute(pileup_with_missing::String; window_size::Int=100, model::String
                     readline(file_in);
                 end
                 close(file_in)
-                max_line = lines - (window_size*7)
+                max_line = lines - window_size
             else
                 ### do not trim the last chunk
                 max_line = Inf

@@ -37,16 +37,6 @@ lines_per_chunk = parse(Int, ARGS[7])
 #             ${chunk_size}
 #     done
 # done
-#
-# pileup_without_missing="/home/jeffersonfparil/Downloads/data/PoPoolImpute/Drosophila-FILTERED_0.0.pileup"
-# githubci=false
-# n=1
-# s=42
-# threads=2
-# window_size=100
-# lines_per_chunk=1000
-# i = 1
-# model = "RR"
 
 using Pkg
 using Random
