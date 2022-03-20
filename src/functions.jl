@@ -294,8 +294,8 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
         n+=1
     end
     close(file)
-    ### To add or not to add leading zeros for ease of chunk sorting
-    leading_zeros = length(digits(Int(ceil(n / lines_per_chunk)))) - 1
+    ### Number of digits to have in each chunk number for ease of sorting
+    n_digits = maximum([ length(digits(Int(ceil(n / lines_per_chunk)))), 1 ])
 
     file = open(filename, "r")
     c1 = 0; c2 = 0
@@ -306,12 +306,12 @@ function SPLIT(filename::String, lines_per_chunk::Int, window_size::Int)::Vector
         ### initialise chunk file
         if i1 == 0
             c1 = c2 + 1
-            chunk_number = string(repeat("0", leading_zeros-Int(floor(log(10, c1)))), c1)
+            chunk_number = string(repeat("0", n_digits - length(digits(c1))), c1)
             global out1 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", chunk_number, ".pileup"), "w")
         end
         if i2 == 0
             c2 = c1 + 1
-            chunk_number = string(repeat("0", leading_zeros-Int(floor(log(10, c2)))), c2)
+            chunk_number = string(repeat("0", n_digits - length(digits(c2))), c2)
             global out2 = open(string(join(split(filename, ".")[1:(end-1)], "."), "-CHUNK_", chunk_number, ".pileup"), "w")
         end
         ### write into chunk file
